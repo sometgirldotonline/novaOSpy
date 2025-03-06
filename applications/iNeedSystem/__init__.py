@@ -5,6 +5,6 @@ def main(session, args=[]):
     else:
         win = self.ui()
         label = win.Label()
-        label.set({"text":"Whalecum, you have the correct permission!"})
+        label.set({"text":"Welcome, you have the correct permissions!"})
 self = basicapplib.Application(name="iNeedSystem")
 self.setScript(kind="main", program=main)

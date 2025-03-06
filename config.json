@@ -1,7 +1,14 @@
 {
-    "users": [{
+    "users": {
+        "system":{
         "name": "system",
         "kind": 0,
         "pass": "dc647eb65e6711e155375218212b3964"
-    }]
+    },
+    "nova":{
+        "name": "nova",
+        "kind": 1,
+        "pass": "dc647eb65e6711e155375218212b3964"
+    }
+}
 }

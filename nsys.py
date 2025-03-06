@@ -1,5 +1,4 @@
-import tkinter.messagebox
-import os, json, tkinter, tkinter.scrolledtext, tkinter.messagebox, traceback, hashlib, importlib;
+import os, json, tkinter, tkinter.scrolledtext, tkinter.messagebox, traceback, hashlib, importlib, time;
 global root;
 root=tkinter.Tk()
 def show_error(self, *args):
@@ -32,6 +31,7 @@ class AuthenticationError(Exception):
     pass
 with open("config.json") as _f:
     _config = json.load(_f)
+    print(_config)
 def getsysinfo():
     return f'{os.uname().sysname} {os.uname().nodename} {os.uname().release} {os.uname().version} {os.uname().machine}';
 
@@ -69,6 +69,9 @@ class sysState:
 class Users():
     def list():
         return _config.get("users")
+    def getAllNames():
+        tempUL = _config.get("users")
+        return [*tempUL.keys()]
     def exec(username: str, passhash: str, program, attributes: list = []):
         return 0;
     def systemProfileInt():
@@ -106,14 +109,32 @@ class Session():
         if(username):
             unamebox.insert(0, username)
         unamebox.pack()
-        tkinter.Label(loginwindow, text="Password").pack()
         passbox = tkinter.Entry(loginwindow)
+        al=tkinter.Listbox(loginwindow)
+        def reloadAL(ev):
+            al.delete(0, tkinter.END)
+            if unamebox.get() in Users.getAllNames():
+                accessLvl = _config.get("users").get(unamebox.get()).get("kind")
+                print(accessLvl)
+                i = 0;
+                levels = Users.profileTypeNames()
+                for l in levels:
+                    print("gae")
+                    print(i)
+                    print(accessLvl)
+                    if i >= accessLvl:
+                        print(l)
+                        print("GaYY")
+                        print(i)
+                        al.insert(i,l);
+                    i+=1;
+        unamebox.bind("<KeyRelease>", reloadAL)
+        tkinter.Label(loginwindow, text="Password").pack()
         passbox.pack()
         tkinter.Label(loginwindow, text="Access Level").pack()
         levels = Users.profileTypeNames()[slice(minPriv+1)]
         log(levels)
         log(minPriv)
-        al=tkinter.Listbox(loginwindow)
         i=1
         al.selection_set(0)
         for e in levels:
@@ -138,6 +159,7 @@ class Session():
                     tkinter.messagebox.showerror("Missing value: Access Level","Pick an Access Level.")
             except Exception as e:
                 tkinter.messagebox.showerror("Authentication Error ("+type(e).__name__+")", e)
+                print(traceback.format_exception(e))
                 # loginwindow.destroy()
                 # loginwindow.quit()
                 cls.showAuthPopup(minPriv, username, appfolder)
@@ -148,8 +170,13 @@ class Session():
         
         
     def Authenticate(instance, username: str, passhash: str, sessionType: int=3):
-        for user in _config.get("users"):
-            if user.get("name") == username:
+        userlist = Users.getAllNames();
+        print(userlist)
+            
+        if username in userlist:
+            user = _config.get("users").get(username)
+            print(user)
+            if username in userlist:
                 if user.get("pass") == passhash:
                     if user.get("kind") <= sessionType:
                         instance.user = username;
@@ -160,9 +187,9 @@ class Session():
                     else:
                         raise AuthenticationError("User "+username+" is not of required permission level ("+str(sessionType)+"/"+Users.profileTypeNames()[sessionType]+") or higher. User has permission level "+str(user.get("kind"))+ " (" +Users.profileTypeNames()[user.get("kind")]+")")
                 else:
-                    raise AuthenticationError("Authentication error, please try again (password)")
-            else:
-                raise UserNotFoundError("User " + username + " not found, please try again (user)");
+                        raise AuthenticationError("Authentication error, please try again (password)")
+        else:
+            raise UserNotFoundError("User " + username + " not found, please try again (user)");
     def exec(cls, program, appfolder:str, attributes: str=""):
         log("gay!")
         if cls.user == None or cls.type == None:
