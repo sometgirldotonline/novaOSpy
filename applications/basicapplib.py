@@ -1,4 +1,4 @@
-import os, tkinter, json, nsys;
+import os, tkinter, tkinter.ttk, json, nsys;
 global Application;
 class Application():
     def __new__(cls, name: str = "", description: str = "", package: str = "", version: str = "", developer: str = "", developer_website: str = "", developer_email: str = ""):
@@ -93,7 +93,7 @@ class uiElementsDoNotUse:
     class Label():
         def __new__(cls, parent, text="idiot, you did not set", size=12):
             instance = super(uiElementsDoNotUse.Label, cls).__new__(cls)
-            instance.tkel = tkinter.Label(parent._tk, text=text, font=('Comic Neue', size))
+            instance.tkel = tkinter.ttk.Label(parent._tk, text=text, font=('Comic Neue', size))
             instance.tkel.pack()
             return instance;
         def set(cls, parameters):

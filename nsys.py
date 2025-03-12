@@ -1,4 +1,4 @@
-import os, json, tkinter, tkinter.scrolledtext, tkinter.messagebox, traceback, hashlib, importlib, time;
+import os, json, tkinter, tkinter.ttk, tkinter.messagebox, tkinter.scrolledtext, traceback, hashlib, importlib, time;
 global root;
 root=tkinter.Tk()
 def show_error(self, *args):
@@ -14,7 +14,7 @@ logwindow.geometry("400x400")
 logtext = tkinter.scrolledtext.ScrolledText(logwindow)
 logtext.config(state=tkinter.DISABLED)
 logtext.pack()
-tkinter.Button(logwindow, text = "Exit", command=exit).pack()
+tkinter.ttk.Button(logwindow, text = "Exit", command=exit).pack()
 _sysStatus = 0
 _sysUser = "";
 _config = {}
@@ -100,11 +100,11 @@ class Session():
         loginwindow = tkinter.Tk()
         loginwindow.title("Authentication Required")
         if(appfolder):
-            tkinter.Label(loginwindow,text=str(appfolder)+" requested rasied session permissions to "+Users.profileTypeNames()[minPriv]+".\nEnter your credentials to proceed.", font=("TkDefaultFont Bold", "15")).pack()
+            tkinter.ttk.Label(loginwindow,text=str(appfolder)+" requested rasied session permissions to "+Users.profileTypeNames()[minPriv]+".\nEnter your credentials to proceed.", font=("TkDefaultFont Bold", "15")).pack()
         else:
-            tkinter.Label(loginwindow, text="Please Log In.", font=("TkDefaultFont Bold", "15")).pack()
+            tkinter.ttk.Label(loginwindow, text="Please Log In.", font=("TkDefaultFont Bold", "15")).pack()
             
-        tkinter.Label(loginwindow, text="Username").pack()
+        tkinter.ttk.Label(loginwindow, text="Username").pack()
         unamebox = tkinter.Entry(loginwindow)
         if(username):
             unamebox.insert(0, username)
@@ -129,9 +129,9 @@ class Session():
                         al.insert(i,l);
                     i+=1;
         unamebox.bind("<KeyRelease>", reloadAL)
-        tkinter.Label(loginwindow, text="Password").pack()
+        tkinter.ttk.Label(loginwindow, text="Password").pack()
         passbox.pack()
-        tkinter.Label(loginwindow, text="Access Level").pack()
+        tkinter.ttk.Label(loginwindow, text="Access Level").pack()
         levels = Users.profileTypeNames()[slice(minPriv+1)]
         log(levels)
         log(minPriv)
@@ -156,15 +156,15 @@ class Session():
                     log(cls.type)
                     return cls;
                 except ValueError:
-                    tkinter.messagebox.showerror("Missing value: Access Level","Pick an Access Level.")
+                    tkinter.tkinter.ttk.Button.showerror("Missing value: Access Level","Pick an Access Level.")
             except Exception as e:
-                tkinter.messagebox.showerror("Authentication Error ("+type(e).__name__+")", e)
+                tkinter.tkinter.ttk.Button.showerror("Authentication Error ("+type(e).__name__+")", e)
                 print(traceback.format_exception(e))
                 # loginwindow.destroy()
                 # loginwindow.quit()
                 cls.showAuthPopup(minPriv, username, appfolder)
             log(cls)
-        tkinter.Button(loginwindow, text="Authenticate", command=handlelogin).pack()
+        tkinter.ttk.Button(loginwindow, text="Authenticate", command=handlelogin).pack()
         loginwindow.mainloop()
         return cls;
         
@@ -206,7 +206,7 @@ class Session():
                 log(args)
                 output += (args.get("session").get("appfolder") + " exited unexpectedly due to a permission defficiency. You are currently logged in as an " + Users.profileTypeNames()[cls.type] + " user. The executable reuqests a " + Users.profileTypeNames()[args.get("requiredLevel")] + " user at minimum.")
                 output += ("\n\nThe executable said: " + args.get("message"))
-                if tkinter.messagebox.askyesno("Permission error!", output):
+                if tkinter.tkinter.ttk.Button.askyesno("Permission error!", output):
                     appsession = Session()
                     appsession.showAuthPopup(minPriv=int(args.get("requiredLevel")),username=args.get("session").get("user"),appfolder=args.get("session").get("appfolder"))
                     capp = importlib.import_module("applications."+args.get("session").get("appfolder"), args.get("session").get("appfolder")).self;                        

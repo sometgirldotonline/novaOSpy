@@ -1,4 +1,4 @@
-import nsys, json, importlib, hashlib, tkinter, time;
+import nsys, json, importlib, hashlib, tkinter, tkinter.ttk, time;
 nsys.log("Booting NovaOS basic example implementation")
 nsys.log("NovaOS 0.0.0 booting on " + nsys.getsysinfo())
 nsys.sysState.set(nsys.sysState.Booting)
@@ -20,17 +20,17 @@ def launcher(session, args):
     # time.sleep(1)            
     root=tkinter.Tk()
     root.protocol("WM_DELETE_WINDOW", exit)
-    tkinter.Label(root, text="NovaOS Launcher Example", font=('Comic Neue Bold', 25)).pack()
+    tkinter.ttk.Label(root, text="NovaOS Launcher Example", font=('Comic Neue Bold', 25)).pack()
     root.title("NovaOS Launcher Example")
     for appfolder in applicationFolders:
         if(not(appfolder.startswith("__"))):
             capp = importlib.import_module("applications."+appfolder, appfolder).self;
             gay = json.dumps(session)
             gay = gay.replace("}",", \"appfolder\":\""+appfolder+"\"}")
-            exec("tkinter.Button(root, text='"+capp.name+"', command=lambda: systemSession.exec(applications["+str(i-1)+"].exec, appfolder='"+appfolder+"')).pack()")
+            exec("tkinter.ttk.Button(root, text='"+capp.name+"', command=lambda: systemSession.exec(applications["+str(i-1)+"].exec, appfolder='"+appfolder+"')).pack()")
             applications.append(capp)
         i +=1;
-    tkinter.Button(root, text="Reauthenticate Session", command=systemSession.showAuthPopup).pack()
+    tkinter.ttk.Button(root, text="Reauthenticate Session", command=systemSession.showAuthPopup).pack()
     # nsys.fadeInWin(root)
     root.mainloop()
 def authloop():
