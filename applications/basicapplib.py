@@ -1,4 +1,5 @@
-import os, tkinter, tkinter.ttk, json, nsys;
+import tkinter.messagebox
+import os, tkinter, tkinter.ttk, json, nsys, random, string;
 global Application;
 class Application():
     def __new__(cls, name: str = "", description: str = "", package: str = "", version: str = "", developer: str = "", developer_website: str = "", developer_email: str = ""):
@@ -12,6 +13,9 @@ class Application():
         instance.developer_mail = developer_email
         instance.windows = []
         instance.con = _con(instance)
+        instance.sys = _sys(instance)
+        instance.power = _power(instance)
+        instance.generators = _generators(instance)
         instance.fs = _fs(instance)
         return instance;
     def setScript(self, kind: str, program):
@@ -25,10 +29,6 @@ class Application():
         return win;
     def requestLevelRaise(self,session, level: int=1, message: str="No message provided"):
         raise PermissionError(json.dumps({"message": message, "requiredLevel":level, "session": session}))
-    def fs(cls):
-        return _fs(cls);
-    def sys(cls):
-        return _sys(cls);
 class _sys:
     def __new__(cls, parent):
         inst = super(_sys, cls).__new__(cls)
@@ -53,7 +53,31 @@ class _con:
         return inst;
     def write(cls, text):
         nsys.log(cls.parent.name+": "+str(text))
-        
+    def read(cls, prompt):
+        return input(cls.parent.name+": "+str(prompt) + "> ")
+class _power:
+        def __new__ (cls, parent):
+            inst = super(_power, cls).__new__(cls)
+            inst.parent = parent;
+            return inst;
+        def poweroff(cls):
+            # Display prompt asking user if they want to power down
+            if tkinter.messagebox.askyesno("Dialog for: "+str(cls.parent.name), str(cls.parent.name) + " would like to turn off the device. Would you like to continue?"):
+                print("Exiting.")
+                nsys.pwrmgr.poweroff()
+                return True
+            else:
+                return False;
+        def reboot(cls):
+            if tkinter.messagebox.askyesno("Dialog for: "+str(cls.parent.name), str(cls.parent.name) + " would like to reboot the device. Would you like to continue?"):
+                print("Rebooting")
+                # tkinter.Tk.quit()
+                nsys.pwrmgr.reboot()
+                return True
+            else: 
+                return False;
+                
+            
 class uiDoNotUse:
     def __new__(cls, parent):
         instance = super(uiDoNotUse, cls).__new__(cls)
@@ -99,3 +123,11 @@ class uiElementsDoNotUse:
         def set(cls, parameters):
             cls.tkel.configure(**parameters)
             return cls
+class _generators:
+    def num(min, max):
+        return random.randrange(min, max, 2);
+    def str(len):
+       return ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(len)) 
+class _UIel:
+        def __new__(cls, parent, type, parameters):
+            print()

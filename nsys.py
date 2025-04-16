@@ -1,4 +1,4 @@
-import os, json, tkinter, tkinter.ttk, tkinter.messagebox, tkinter.scrolledtext, traceback, hashlib, importlib, time;
+import sys, os, json, tkinter, tkinter.ttk, tkinter.messagebox, tkinter.scrolledtext, traceback, hashlib, importlib, time;
 global root;
 root=tkinter.Tk()
 def show_error(self, *args):
@@ -227,3 +227,12 @@ def fadeInWin(root):
         root._Tjob = root.after(5,lambda:fadeInWin(root))
     else:
         root.after_cancel(root._animT)
+        
+class pwrmgr():
+    def poweroff():
+        exit()
+    def reboot():
+        python = sys.executable
+        print("Please manually relaunch NovaOS. Auto-Relaunch is not supported in this environment. NOTE FOR IMPLEMENTERS: DO NOT LEAVE THIS NOTE, REPLACE IT WITH THE METHOD OF REBOOTING FOR YOUR PLATFORM")
+        exit()
+        # os.execl(python, python, * sys.argv)
