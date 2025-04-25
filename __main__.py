@@ -1,6 +1,6 @@
 import nsys, json, importlib, hashlib, tkinter, tkinter.ttk, time;
-nsys.log("Booting NovaOS basic example implementation")
-nsys.log("NovaOS 0.0.0 booting on " + nsys.getsysinfo())
+systemVersion = "0.0.0"
+nsys.log(f"NovaOS {systemVersion} booting on " + nsys.getsysinfo())
 nsys.sysState.set(nsys.sysState.Booting)
 def picker(applications):
     try:

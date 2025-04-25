@@ -1,5 +1,5 @@
 import tkinter.messagebox
-import os, tkinter, tkinter.ttk, json, nsys, random, string;
+import os, tkinter, tkinter.ttk, json, nsys, random, string, platform;
 global Application;
 class Application():
     def __new__(cls, name: str = "", description: str = "", package: str = "", version: str = "", developer: str = "", developer_website: str = "", developer_email: str = ""):
@@ -15,7 +15,7 @@ class Application():
         instance.con = _con(instance)
         instance.sys = _sys(instance)
         instance.power = _power(instance)
-        instance.generators = _generators(instance)
+        instance.generators = _generators()
         instance.fs = _fs(instance)
         return instance;
     def setScript(self, kind: str, program):
@@ -29,15 +29,17 @@ class Application():
         return win;
     def requestLevelRaise(self,session, level: int=1, message: str="No message provided"):
         raise PermissionError(json.dumps({"message": message, "requiredLevel":level, "session": session}))
+
+un = platform.uname();
 class _sys:
     def __new__(cls, parent):
         inst = super(_sys, cls).__new__(cls)
         inst.parent = parent;
         return inst;
     platform = {
-            "string": f'{os.uname().sysname} {os.uname().nodename} {os.uname().release} {os.uname().version} {os.uname().machine}',
-            "hostplatform": os.uname().sysname,
-            "architecture": os.uname().machine,
+            "string": f'{un.system} {un.node} {un.release} {un.version} {un.machine}',
+            "hostplatform": un.system,
+            "architecture": un.machine,
         }
 class _fs:
     def __new__(cls, parent):

@@ -1,14 +1,15 @@
 {
+    "logLevel": 1,
     "users": {
         "system":{
         "name": "system",
         "kind": 0,
-        "pass": "dc647eb65e6711e155375218212b3964"
+        "pass": "5f4dcc3b5aa765d61d8327deb882cf99"
     },
-    "nova":{
-        "name": "nova",
+    "user":{
+        "name": "user",
         "kind": 1,
-        "pass": "dc647eb65e6711e155375218212b3964"
+        "pass": "5f4dcc3b5aa765d61d8327deb882cf99"
     }
 }
 }
