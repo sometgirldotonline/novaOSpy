@@ -1,4 +1,5 @@
 import sys
+args = sys.argv
 if __name__ == "__main__":
     print("Do not run this script! You should run the system python file (__main__.py) instead.")
     sys.exit()
@@ -9,8 +10,14 @@ root = tkinter.Tk()
 
 def show_error(self, *args):
     log("Error occurred", level=1)
-    log(traceback.format_exception(*args), level=2)
-    raise args[0](args[1])
+    print(traceback.format_exception(*args))
+    try:
+        raise args[0](args[1])
+    except:
+        print(args)
+    if sysState.testMode == sysState.get():
+        exit()
+
 
 tkinter.Tk.report_callback_exception = show_error
 
@@ -85,15 +92,14 @@ class sysState:
 
     def sysAuthenticated():
         return 4
-
     def poweringDown():
         return 5
-
+    def testMode():
+        return 6
     def stateNames():
-        return ["Unknown", "Booted", "Awaiting Login", "Logged in", "Power down requested"]
-
+        return ["Unknown", "Booting", "Booted", "Awaiting Login", "Authenticated", "Powering Down", "TEST MODE"]
     def stateDescriptions():
-        return ["State unset.", "Waiting for first profile to authenticate", "Logged in to " + _sysUser, "A shutdown has been requested."]
+        return ["State unset.", "Booting", "Booted", "Waiting for first profile to authenticate", "Logged in to " + _sysUser, "A shutdown has been requested.", "TEST MODE. DO NOT USE THIS IN PRODUCTION."]
 
 class Users:
     def list():
@@ -130,12 +136,7 @@ def refresh():
     except:
         return False
 
-class Session:
-    def __new__(cls):
-        instance = super(Session, cls).__new__(cls)
-        return instance
-
-    def showAuthPopup(cls, minPriv: int = 3, username: str = False, appfolder: str = False):
+def showAuthPopup(cls, minPriv: int = 3, username: str = False, appfolder: str = False):
         loginwindow = tkinter.Tk()
         loginwindow.title("Authentication Required")
         if appfolder:
@@ -195,6 +196,12 @@ class Session:
         loginwindow.mainloop()
         return cls
 
+class Session:
+    def __new__(cls):
+        instance = super(Session, cls).__new__(cls)
+        return instance
+    def showAuthPopup(cls, minPriv: int = 3, username: str = False, appfolder: str = False):
+        showAuthPopup(cls, minPriv=minPriv, username=username, appfolder=appfolder)
     def Authenticate(instance, username: str, passhash: str, sessionType: int = 3):
         userlist = Users.getAllNames()
         if username in userlist:
@@ -211,23 +218,106 @@ class Session:
         else:
             raise UserNotFoundError(f"User {username} not found, please try again (user)")
 
-    def exec(cls, program, appfolder: str, attributes: str = ""):
+    def exec(cls, program, appfolder: str, arguments: str = ""):
+        print("Executing " + program.__name__ + " with arguments: " + str(arguments))
         if cls.user is None or cls.type is None:
             raise AuthenticationError("Session not authenticated")
+        print("Running " + program.__name__ + " with arguments: " + str(arguments) + " and appfolder: " + str(appfolder) + " as user: " + str(cls.user) + " with type: " + str(cls.type))
         try:
-            program({"user": cls.user, "type": cls.type, "appfolder": appfolder}, attributes)
+            program(cls, arguments)
+        except Exception as e:
+            if(type(e) == PermissionError):
+                print("Running " + program.__name__ + " failed with PermissionError: " + str(e))
+                args = json.loads(str(e.args[0]))
+                output = (f"{args.get('session').get('appfolder')} exited unexpectedly due to a permission deficiency. "
+                        f"You are currently logged in as a {Users.profileTypeNames()[cls.type]} user. "
+                        f"The executable requests a {Users.profileTypeNames()[args.get('requiredLevel')]} user at minimum.\n\n"
+                        f"The executable said: {args.get('message')}")
+                if tkinter.messagebox.askyesno("Permission error!", output):
+                    appsession = Session()
+                    appsession.showAuthPopup(minPriv=int(args.get("requiredLevel")), username=args.get("session").get("user"), appfolder=args.get("session").get("appfolder"))
+                    capp = importlib.import_module("applications." + args.get("session").get("appfolder"), args.get("session").get("appfolder")).self
+                    appsession.exec(capp.exec, appfolder=args.get("session").get("appfolder"))
+            else:
+                # Throw the error to the console like normal
+                raise e
+        # if program ends in test mode, exit the system
+
+
+class AppSession:
+    def __new__(cls, appfolder, parent):
+        instance = super(AppSession, cls).__new__(cls)
+        instance.appfolder = appfolder
+        instance.parent = parent
+        if parent != None:
+            instance.user = parent.user
+            instance.type = parent.type
+        return instance
+
+    def showAuthPopup(self, minPriv: int = 3):
+        showAuthPopup(self, minPriv=minPriv, username=self.parent.user, appfolder=self.appfolder)
+        
+
+    def Authenticate(self, username: str, passhash: str, sessionType: int = 3):
+        userlist = Users.getAllNames()
+        if username in userlist:
+            user = _config.get("users").get(username)
+            if user.get("pass") == passhash:
+                if user.get("kind") <= sessionType:
+                    self.user = username
+                    self.type = sessionType
+                    return self
+                else:
+                    raise AuthenticationError(f"User {username} is not of required permission level ({sessionType}/{Users.profileTypeNames()[sessionType]}) or higher. User has permission level {user.get('kind')} ({Users.profileTypeNames()[user.get('kind')]})")
+            else:
+                raise AuthenticationError("Authentication error, please try again (password)")
+        else:
+            raise UserNotFoundError(f"User {username} not found, please try again (user)")
+
+    def exec(cls, arguments: str = ""):
+        appfolder = cls.appfolder
+        print("Executing " + appfolder + " with arguments: " + str(arguments))
+        if cls.user is None or cls.type is None:
+            raise AuthenticationError("Session not authenticated")
+        print("Running " + appfolder + " with arguments: " + str(arguments) + " and appfolder: " + str(appfolder) + " as user: " + str(cls.user) + " with type: " + str(cls.type))
+        try:
+            # program({"user": cls.user, "type": cls.type, "appfolder": appfolder}, arguments)
+            app_spec = importlib.util.spec_from_file_location(name=appfolder.replace(".",""), location=f"./applications/{appfolder}/__init__.py")
+            app_module = importlib.util.module_from_spec(app_spec)
+            app_spec.loader.exec_module(app_module)
+            app_instance = app_module.self
+            app_instance.exec(cls, arguments)
         except PermissionError as e:
+            print("Running " + appfolder +  " failed with PermissionError: " + str(e))
             args = json.loads(str(e.args[0]))
             output = (f"{args.get('session').get('appfolder')} exited unexpectedly due to a permission deficiency. "
                       f"You are currently logged in as a {Users.profileTypeNames()[cls.type]} user. "
                       f"The executable requests a {Users.profileTypeNames()[args.get('requiredLevel')]} user at minimum.\n\n"
                       f"The executable said: {args.get('message')}")
             if tkinter.messagebox.askyesno("Permission error!", output):
-                appsession = Session()
-                appsession.showAuthPopup(minPriv=int(args.get("requiredLevel")), username=args.get("session").get("user"), appfolder=args.get("session").get("appfolder"))
-                capp = importlib.import_module("applications." + args.get("session").get("appfolder"), args.get("session").get("appfolder")).self
-                appsession.exec(capp.exec, appfolder=args.get("session").get("appfolder"))
+                showAuthPopup(cls=cls,minPriv=int(args.get("requiredLevel")), username=args.get("session").get("user"), appfolder=args.get("session").get("appfolder"))
+                # capp = importlib.import_module("applications." + args.get("session").get("appfolder"), args.get("session").get("appfolder")).self
+                # appsession.exec(capp.exec, appfolder=args.get("session").get("appfolder"))
 
+
+def requestAppPermRaise(args):
+    print(args.get("session"))
+    output = (f"{args.get('session').appfolder} exited unexpectedly due to a permission deficiency. "
+                f"You are currently logged in as a {Users.profileTypeNames()[args.get("session").type]} user. "
+                f"The executable requests a {Users.profileTypeNames()[args.get('requiredLevel')]} user at minimum.\n\n"
+                f"The executable said: {args.get('message')}")
+    if tkinter.messagebox.askyesno("Permission error!", output):
+        appsession = AppSession(args.get("session").appfolder, args.get("session"))
+        appsession.showAuthPopup(minPriv=int(args.get("requiredLevel")))
+        print(args)
+        app_id = args.get("session").appfolder
+        # app_spec = importlib.util.spec_from_file_location(name=app_id.replace(".",""), location=f"./applications/{app_id}/__init__.py")
+        # app_module = importlib.util.module_from_spec(app_spec)
+        # app_spec.loader.exec_module(app_module)
+        # app_instance = app_module.self
+        appsession.exec()
+        # appsession.exec(app_instance.exec, appfolder=app_id)
+                
 def fadeInWin(root):
     try:
         root._animT
