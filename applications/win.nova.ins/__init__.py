@@ -5,7 +5,8 @@ def main(session, args=[]):
     print(session.parent.type)
     print(session.parent.user)
     if(session.type > 0):
-        self.requestLevelRaise(session=session,level=0,message="This app needs System permission (0) or lower, but the authenticated user ("+session.user+") only has permission level "+str(session.type))
+        # self.requestLevelRaise(session=session,level=0,message="This app needs System permission (0) or lower, but the authenticated user ("+session.user+") only has permission level "+str(session.type))
+        session.showAuthPopup(minPriv=0)
     else:
         win = self.ui()
         label = win.Label()

@@ -1,10 +1,97 @@
 import tkinter.messagebox
+from concurrent.futures import ThreadPoolExecutor
 import tkinter.scrolledtext
-import os, tkinter, tkinter.ttk, json, nsys, random, string, platform;
+import os, tkinter, tkinter.ttk, json, Libraries.nsys as nsys, random, string, platform;
 from permissions import PermissionSubsystem;
 import threading;
+from Libraries.nsys import windows;
+from Libraries.nsys import sysUI;
+import numpy as np
+from __main__ import resized_bmps, previous_bmps;
 psys = PermissionSubsystem();
 global Application;
+# Initialize cache dictionaries for raw BMP data and resized images
+
+def read_bmp_rgb_array(filename, target_width=None, target_height=None, cachedOnly=False):
+    # Check if the raw BMP data is cached
+    cache_key = (filename)
+    if cachedOnly:
+        # If cachedOnly is True, return None if not found in cache, check filename only
+        if cache_key not in previous_bmps:
+            print(f"Image {filename} not found in cache.")
+            return None
+    cache_key = (filename, target_width, target_height)
+    if cache_key in resized_bmps:
+        return resized_bmps[cache_key]
+    # Check if the raw BMP data is already cached for the image without resizing
+    raw_pixels = previous_bmps.get((filename))
+    if not raw_pixels:
+        with open(filename, "rb") as f:
+            f.seek(10)
+            pixel_offset = int.from_bytes(f.read(4), "little")
+
+            f.seek(18)
+            width = int.from_bytes(f.read(4), "little")
+            height = int.from_bytes(f.read(4), "little")
+
+            f.seek(28)
+            bpp = int.from_bytes(f.read(2), "little")
+            if bpp != 24:
+                raise ValueError("Only 24-bit BMPs are supported.")
+
+            row_size = (width * 3 + 3) & ~3
+            f.seek(pixel_offset)
+
+            raw_pixels = [None] * height
+            for y in reversed(range(height)):
+                row = [tuple(f.read(3)[::-1]) for _ in range(width)]
+                padding = row_size - width * 3
+                if padding:
+                    f.read(padding)
+                raw_pixels[y] = row
+
+        # Cache the raw image for future conversions
+        previous_bmps[(filename)] = raw_pixels
+
+    width, height = len(raw_pixels[0]), len(raw_pixels)
+
+    # Skip resize if dimensions match or are not provided
+    if not target_width or not target_height or (target_width == width and target_height == height):
+        resized_bmps[cache_key] = raw_pixels
+        return raw_pixels
+
+    # Resize logic
+    resized = []
+
+    # If scaling down, we skip pixels
+    if target_width < width or target_height < height:
+        for y in range(target_height):
+            src_y = int(y * height / target_height)
+            row = []
+            for x in range(target_width):
+                src_x = int(x * width / target_width)
+                row.append(raw_pixels[src_y][src_x])
+            resized.append(row)
+    
+    # If scaling up, we duplicate pixels
+    else:
+        for y in range(target_height):
+            src_y = int(y * height / target_height)
+            row = []
+            for x in range(target_width):
+                src_x = int(x * width / target_width)
+                row.append(raw_pixels[src_y][src_x])
+                
+                # If scaling up, duplicate the pixel
+                if width < target_width:
+                    row.append(raw_pixels[src_y][src_x])  # Repeat pixel horizontally
+            resized.append(row)
+
+    # Cache the resized image for future requests
+    cache_key = (filename, target_width, target_height)
+    resized_bmps[cache_key] = resized
+    return resized
+
 class Application():
     # type is one of "basic" or "scheduled"
     def __new__(cls, app_folder=os.path.dirname(os.path.realpath(__file__)), type="basic"):
@@ -45,14 +132,31 @@ class Application():
                 instance.developer_mail = meta_data.get("developer_email", "")
         else:
             raise FileNotFoundError(f"meta.json not found in {app_folder}")
-
+        instance.running = False
         instance.windows = []
         instance.con = _con(instance)
         instance.sys = _sys(instance)
         instance.power = _power(instance)
         instance.generators = _generators()
+        instance.thread = None
         instance.apps = _apps(instance)
         return instance;
+    def preprocessImages(self, image_paths, waitForCompletion=False, onComplete=None):
+        executor = ThreadPoolExecutor()
+        futures = [executor.submit(read_bmp_rgb_array, path) for path in image_paths]
+
+        if waitForCompletion:
+            for future in futures:
+                future.result()  # ensures completion
+
+        if onComplete:
+            onComplete()
+
+        if not waitForCompletion:
+            # Clean shutdown without waiting
+            executor.shutdown(wait=False)
+        else:
+            executor.shutdown(wait=True)
 
     def setScript(self, kind: str, program):
         if(kind == "main"):
@@ -61,30 +165,33 @@ class Application():
             self.startScript = program;
         elif(kind == "stop"):
             self.stopScript = program;
-        elif(kind == "tick"):
-            self.tickScript = program;
-    def tick(self):
-        self.tickScript(self)
     def start(self):
+        self.running = True
         if hasattr(self, "startScript"):
             self.startScript(self)
-        self.running = True
     def stop(self):
+        self.running = False
         if hasattr(self, "stopScript"):
             self.stopScript(self)
-        self.running = False
+        if self.thread != None:
+            self.thread.terminate()
     def exec(self, session, args):
+        self.session = session
         if hasattr(self, "program") & (self.type == "basic"):
             self.program(session, args)
-        elif hasattr(self, "startScript") & self.type == "scheduled":
+        elif hasattr(self, "startScript") and self.type == "scheduled":
             # throw an error because scheduled apps are launched differently
             return {"error": "Scheduled apps cannot be launched with exec()", "reason":"ScheduledApp"}
         else:
             return {"error": "No script set for this application", "reason":"NoScript"}
     def exitApp(self):
+        # self.thread.terminate()
+        self.session.exit()
+        print("EXIIT")
+        for win in self.windows:
+            windows.__delitem__(win.index)
+            self.windows.remove(win)
         if self.type == "basic":
-            if hasattr(self, '_tk'):
-                self._tk.destroy()
             if nsys.sysState.get() == nsys.sysState.testMode:
                 exit()
         elif self.type == "scheduled":
@@ -92,9 +199,10 @@ class Application():
                 self.stop()
         else:
             raise TypeError("Invalid application type. Must be 'basic' or 'scheduled'.")
-    def ui(cls):
-        win = _ui(cls)
+    def ui(cls, geo=(200, 200), pos=(0, 0), colour=(220, 220, 220), title="", drawAlways=False, clearFrames=True):
+        win = _ui(cls, geo=geo, pos=pos, colour=colour,title=title,drawAlways=drawAlways,clearFrames=clearFrames)
         cls.windows.append(win);
+        windows.append(win.updateJSON())
         return win;
     def fs(cls):
         diderror = False
@@ -104,10 +212,6 @@ class Application():
         # if not hasattr(cls, "fs") & (not diderror):
             cls.fs = _fs(cls)
         return _fs(cls);
-    # def requestLevelRaise(self,session, level: int=1, message: str="No message provided"):
-    #     # raise PermissionError(json.dumps({"message": message, "requiredLevel":level, "session": session}))
-    #     nsys.requestAppPermRaise({"message": message, "requiredLevel":level, "session": session})
-    #     self.exitApp()
     def requestPermission(self,permission, data=[]):
         if permission == None:
             raise TypeError("Expected 'String' type not 'None' Type.")
@@ -144,6 +248,11 @@ class Application():
     def uninstall(self):
         return psys.uninstallApp(self.id)
 
+class _generators:
+    def num(min, max):
+        return random.randrange(min, max, 2);
+    def str(len):
+       return ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(len)) 
 
 class _apps:
     def __new__(cls,parent):
@@ -244,108 +353,211 @@ class _power:
             else: 
                 return False;
           
+def exitAppIfNoWin(app, window):
+    app.windows.remove(window)
+    if len(app.windows) == 0:
+        app.exitApp()
+class _ui:
+    def __new__(cls, parent, geo=(200, 200), pos=(0, 0), colour=(220, 220, 220), title="", drawAlways=False, clearFrames=True):
+        print("Creating window for: " + parent.package)
+        instance = super(_ui, cls).__new__(cls)
+
+        # Set window properties
+        instance.title = title if title else parent.package
+        instance.geo = geo
+        instance.pos = pos
+        instance.colour = colour
+        instance.components = []
+        instance.parent = parent
+
+        # JSON representation of the window
+        instance.nUiObject = {
+            "title": instance.title,
+            "pos": instance.pos,
+            "geo": instance.geo,
+            "colour": instance.colour,
+            "clearFrames": clearFrames,
+            "drawAlways": drawAlways,
+            "components": [],
+            "onCloseFunc": lambda: exitAppIfNoWin(parent, instance),
+            "onFrameStart": instance.onFrameStart,  # Placeholder for onFrameStart event
+        }
+        return instance
+    # framedraw function
+    def set(self, geo=None, pos=None, colour=None, title=None, drawAlways=None, clearFrames=None):
+        # Update the window's properties in the JSON
+        if geo is not None:
+            self.nUiObject["geo"] = geo
+        if pos is not None:
+            self.nUiObject["pos"] = pos
+        if colour is not None:
+            self.nUiObject["colour"] = colour
+        if title is not None:
+            self.nUiObject["title"] = title
+        if drawAlways is not None:
+            self.nUiObject["drawAlways"] = drawAlways
+        if clearFrames is not None:
+            self.nUiObject["clearFrames"] = clearFrames
+    def onFrameStart(self, fc):
+        # if our window (self) has a onFrameStart function, call it
+        try:
+            self.ofsprog(self, fc)
+        except Exception as e:
+            nsys.log(f"Error in onFrameStart: {e}")
+    def Label(self, text="Unset Value", size=12, colour=(0, 0, 0)):
+        # Add a label component to the JSON
+        element_id = len(self.nUiObject["components"])
+        self.nUiObject["components"].append({
+            "type": "text",
+            "text": str(text),
+            "size": size,
+            "colour": colour
+        })
+
+        # Return a template object to allow further updates
+        return uiElTemplate(self, element_id)
+
+    def Input(self, value="", size=12, colour=(0, 0, 0), bg=(255, 255, 255), border=(0, 0, 0), geo=(300, 20)):
+        # Add an input box component to the JSON
+        element_id = len(self.nUiObject["components"])
+        self.nUiObject["components"].append({
+            "type": "input",
+            "value": str(value),
+            "size": size,
+            "colour": colour,
+            "bg": bg,
+            "border": border,
+            "geo": geo
+        })
+
+        # Return a template object to allow further updates
+        return uiElTemplate(self, element_id)
+    def hookEvent(self, event, callback):
+        # first event is onFrameStart
+        if event == "onFrameStart":
+            # add callback to the windows JSON so it can be called when the frame starts
+            self.ofsprog = callback
+            # synchronize the callback with the system UI
+        print(f"Hooking event '{event}' with callback {callback} for window: {self.parent.package}")
+            
+    def Image(self, path="luke.bmp", height=None, width=None, cachedOnly=False):
+        element_id = len(self.nUiObject["components"])
+        bmparray = None
+        if path == "" or path is None:
+            # set bmparray to an empty numpy array of the specified height and width with colour (0, 0, 0)
+            if height is None or width is None:
+                height = 100
+                width = 100
+            bmparray = np.zeros((height, width, 3), dtype=np.uint8)
+        else:
+            bmparray = read_bmp_rgb_array(path, width, height, cachedOnly=cachedOnly)
+        self.nUiObject["components"].append({
+            "type": "image",
+            "width": width,
+            "height": height,
+            "image": bmparray,
+            "cachedOnly": cachedOnly,
+        })
+        return uiElTemplate(self, element_id)
+
+    def scrolledtext(self, text="Unset Value", size=12, colour=(0, 0, 0)):
+        # Proxy scrolled text to a label in the JSON
+        element_id = len(self.nUiObject["components"])
+        self.nUiObject["components"].append({
+            "type": "text",  # Proxy as a label
+            "text": str(text),
+            "size": size,
+            "colour": colour
+        })
+
+        # Return a template object to allow further updates
+        return uiElTemplate(self, element_id)
+
+    def btn(self, text="Unset Value", size=12, colour=(100, 100, 150), bg=(190, 190, 190), border=(0, 0, 0)):
+        # Add a button component to the JSON
+        element_id = len(self.nUiObject["components"])
+        self.nUiObject["components"].append({
+            "type": "button",
+            "text": str(text),
+            "size": size,
+            "colour": colour,
+            "bg": bg,
+            "border": border
+        })
+
+        # Return a template object to allow further updates
+        return uiElTemplate(self, element_id)
+
+    def updateJSON(self):
+        # Return the current JSON representation of the window
+        return self.nUiObject
+
+    def basicAsk(cls, prompt="Enter a value:", default_value="", callback=None):
+        # Create a new dialog window in the JSON
+        dialog_id = len(sysUI)
+        dialog_json = {
+            "type": "dialog",
+            "title": "Input Dialog",
+            "prompt": prompt,
+            "value": default_value,
+            "geo": (300, 150),  # Default size for the dialog
+            "pos": (200, 200),  # Default position for the dialog
+            "colour": (250, 250, 250),
+            "components": [
+                {
+                    "type": "text",
+                    "text": prompt,
+                    "colour": (0, 0, 0)  # Default text colour
+                },
+                {
+                    "type": "input",
+                    "value": default_value,
+                    "colour": (0, 0, 0),  # Default text colour
+                    "geo": (300, 20),
+                    "bg": (255, 255, 255),  # Default background colour
+                    "border": (0, 0, 0)  # Default border colour
+                },
+                {
+                    "type": "button",
+                    "text": "OK",
+                    "colour": (100, 100, 150),
+                    "bg": (190, 190, 190),
+                    "border": (0, 0, 0),
+                    "on_click": None  # Placeholder for the button's click event
+                }
+            ]
+        }
+        sysUI.append(dialog_json)
+
+        # Assign the on_click function to the "OK" button
+        def runCallback():
+            sysUI.pop(dialog_id, None)
+            if callable(callback):
+                callback(sysUI[dialog_id]["components"][1]["value"])
+
+        sysUI[dialog_id]["components"][2]["on_click"] = runCallback
+
 
 class uiElTemplate:
-    def set(cls, parameters):
-        cls.tkel.configure(**parameters)
-        return cls
-    def get(cls, parameter):
-        return cls.tkel.cget(parameter)
-class _ui:
-    def __new__(cls, parent):
-        print("Creating window for: " + parent.name)
-        instance = super(_ui, cls).__new__(cls)
-        # check if tkinter is already running with an existing window
-        instance._tk = tkinter.Toplevel()
-        instance.name = "Window for: " + parent.name
-        instance._tk.title(instance.name)
-        instance.parent = parent
-        instance._ocev = False;
-        def balClose():
-            nsys.log(parent.name+"(basicapplib): "+str(parent.windows))
-            index = list.index(parent.windows, instance)
-            instance._tk.destroy()
-            list.remove(parent.windows, instance)
-            nsys.log(parent.name+"(basicapplib): "+str(parent.windows))
-        def on_closing():
-            if instance._ocev != False:
-                if instance._ocev(instance): # must return a truthy value to continue!
-                    balClose()
-            else:
-                balClose()
-            if nsys.sysState.testMode == nsys.sysState.get():
-                exit()
-        instance._tk.protocol("WM_DELETE_WINDOW", on_closing)
-        instance.elements=[]
-        instance._tk.after(300, instance._tk.focus_force)
-        return instance;
+    def __init__(self, parent, element_id):
+        self.parent = parent
+        self.element_id = element_id
 
-    def onWindowClose(cls, ev):
-        cls._ocev=ev;
-        return cls;
-    def uiApploop(cls): # used for platforms where a loop is required for keepalive
-        cls._tk.mainloop()
-    def Label(cls, text="Unset Value", size=12):
-        el = _uiElLabel(cls, text, size)
-        cls.elements.append(el)
-        return el;
-    def scrolledtext(cls, text="Unset Value", size=12):
-        el = _uiElSt(cls, text, size)
-        cls.elements.append(el)
-        return el;
-    def btn(cls, text="Unset Value", size=12):
-        el = _uiElBtn(cls,text,size)
-        cls.elements.append(el)
-        return el;
-    def basicAsk(cls,prompt):
-        from tkinter.simpledialog import askstring;
-        return askstring("Dialog for: "+cls.parent.name, prompt)  
-    def basicAskint(cls,prompt):
-        from tkinter.simpledialog import askinteger
-        return askinteger("Dialog For: "+cls.parent.name, prompt)
-    
+    def set(self, parameters):
+        # Update the element's properties in the JSON
+        
 
-class _uiElLabel(uiElTemplate):
-        def __new__(cls, parent, text="idiot, you did not set", size=12):
-            instance = super(_uiElLabel, cls).__new__(cls)
-            instance.tkel = tkinter.ttk.Label(parent._tk, text=text, font=('sans-serif', size))
-            instance.tkel.pack()
-            return instance;
-class _uiElSt(uiElTemplate):
-    def __new__(cls, parent, text="Idiot", size=12):
-        instance = super(_uiElSt, cls).__new__(cls)
-        instance.tkel = tkinter.scrolledtext.ScrolledText(parent._tk, font=('sans-serif', size))
-        instance.tkel.insert("1.0", text)  # Insert new text
-        instance.tkel.pack()
-        return instance
-    def set(cls, parameters):
-        print(parameters)
-        for p in parameters:
-            if(p == "text"):
-                cls.tkel.delete("1.0", "end")  # Delete existing text
-                cls.tkel.insert("1.0", parameters[p])  # Insert new text
+        for key, value in parameters.items():
+            if self.parent.nUiObject["components"][self.element_id]["type"] == "image" and key == "path":
+                arr = read_bmp_rgb_array(value, self.parent.nUiObject["components"][self.element_id]["width"], self.parent.nUiObject["components"][self.element_id]["height"], cachedOnly=self.parent.nUiObject["components"][self.element_id].get("cachedOnly", False))
+                if arr != None:
+                    self.parent.nUiObject["components"][self.element_id]["image"] = arr
             else:
-                cls.tkel.configure({p:parameters[p]})
-        return cls
-    def get(cls, parameter):
-        if(parameter == "text"):
-            return cls.tkel.get("1.0", "end-1c")
-        else:
-            return cls.tkel.cget(parameter)
-class _uiElBtn(uiElTemplate):
-    def __new__(cls, parent, text="Idiot", size=12):
-        instance = super(_uiElBtn, cls).__new__(cls)
-        instance.tkel = tkinter.Button(parent._tk, text=text, font=("sans-serif", size))
-        instance.tkel.pack()
-        return instance
-    def setOnClick(cls, command=lambda: print("Wheres the bind fool")):
-        cls.tkel.config(command=command)
-        return cls;
-class _generators:
-    def num(min, max):
-        return random.randrange(min, max, 2);
-    def str(len):
-       return ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(len)) 
-class _UIel:
-        def __new__(cls, parent, type, parameters):
-            print()
+                self.parent.nUiObject["components"][self.element_id][key] = value
+        return self
+
+    def get(self, parameter):
+        # Retrieve the element's property from the JSON
+        return self.parent.nUiObject["components"][self.element_id].get(parameter)
+    def setOnClick(self, command):
+        self.parent.nUiObject["components"][self.element_id]["on_click"] = command
