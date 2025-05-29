@@ -1,0 +1,9 @@
+{
+    "name": "Psys Test",
+    "id": "win.nova.psystest",
+    "version": "1.0.0",
+    "description": "Test the Psys",
+    "developer": "Example Inc.",
+    "developer_website": "https://example.com",
+    "developer_email": "example@example.com"
+}

@@ -1,9 +1,0 @@
-{
-    "name": "Hello World",
-    "id": "com.example.helloworld",
-    "version": "1.0.0",
-    "description": "An example hello world app",
-    "developer": "Example Inc.",
-    "developer_website": "https://example.com",
-    "developer_email": "example@example.com"
-}

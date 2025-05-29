@@ -1,0 +1,9 @@
+{
+    "name": "SessionTester",
+    "id": "win.nova.st",
+    "version": "1.0.0",
+    "description": "Checks session details",
+    "developer": "Example Inc.",
+    "developer_website": "https://example.com",
+    "developer_email": "example@example.com"
+}
