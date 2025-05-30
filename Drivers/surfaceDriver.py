@@ -414,11 +414,11 @@ class SurfaceDriver:
                         if self.callback:
                             # Note: we pass width and height in the conventional order (width first, then height)
                             self.callback(self.pixel_data, frame, self.width, self.height)                # If a callback is provided, use it to update the pixel data
-                pygame.mouse.set_visible(True)
+                # pygame.mouse.set_visible(True)
                 if self.callback:
                     # Pass width and height in the conventional order (width first, then height)
                     self.callback(self.pixel_data, frame, self.width, self.height, eventgetter=eventgetter)# Create a surface from the pixel data
-                    pygame.mouse.set_visible(False)
+                    # pygame.mouse.set_visible(False)
                 # Note: Pygame expects pixel data in a certain format - they might be transposing
                 # the array internally which could contribute to rotation issues
                 surface = pygame.surfarray.make_surface(self.pixel_data.swapaxes(0, 1))

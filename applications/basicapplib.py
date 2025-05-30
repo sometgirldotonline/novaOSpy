@@ -5,14 +5,30 @@ import os, tkinter, tkinter.ttk, json, Libraries.nsys as nsys, random, string, p
 from permissions import PermissionSubsystem;
 import threading;
 from Libraries.nsys import windows;
+import time
 from Libraries.nsys import sysUI;
 import numpy as np
+import struct
 from __main__ import resized_bmps, previous_bmps;
 psys = PermissionSubsystem();
 global Application;
 # Initialize cache dictionaries for raw BMP data and resized images
 
-def read_bmp_rgb_array(filename, target_width=None, target_height=None, cachedOnly=False):
+def rgb_to_rgb565(r, g, b):
+    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+def rgb565_to_rgb888(rgb565):
+    # Extract red, green, and blue components
+    r = (rgb565 >> 11) & 0x1F
+    g = (rgb565 >> 5) & 0x3F
+    b = rgb565 & 0x1F
+
+    # Scale back to 8 bits
+    r = (r << 3) | (r >> 2)
+    g = (g << 2) | (g >> 4)
+    b = (b << 3) | (b >> 2)
+
+    return r, g, b
+def read_bmp_rgb_array(filename, target_width=None, target_height=None, cachedOnly=False, imagesObject=None):
     # Check if the raw BMP data is cached
     cache_key = (filename)
     if cachedOnly:
@@ -24,45 +40,46 @@ def read_bmp_rgb_array(filename, target_width=None, target_height=None, cachedOn
     if cache_key in resized_bmps:
         return resized_bmps[cache_key]
     # Check if the raw BMP data is already cached for the image without resizing
-    raw_pixels = previous_bmps.get((filename))
-    if not raw_pixels:
-        with open(filename, "rb") as f:
-            f.seek(10)
-            pixel_offset = int.from_bytes(f.read(4), "little")
+    with open(filename, "rb") as f:
+        data = f.read()  # Read the entire file into memory
+    if (filename) in previous_bmps:
+        print("Using initial cache")
+        raw_pixels = previous_bmps[(filename)]
+        width = len(previous_bmps[(filename)][0])
+        height = len(previous_bmps[(filename)])
+    else:
+        # Parse BMP header
+        pixel_offset = struct.unpack_from("<I", data, 10)[0]
+        width = struct.unpack_from("<I", data, 18)[0]
+        height = struct.unpack_from("<I", data, 22)[0]
+        bpp = struct.unpack_from("<H", data, 28)[0]
 
-            f.seek(18)
-            width = int.from_bytes(f.read(4), "little")
-            height = int.from_bytes(f.read(4), "little")
+        if bpp != 24:
+            raise ValueError("Only 24-bit BMPs are supported.")
 
-            f.seek(28)
-            bpp = int.from_bytes(f.read(2), "little")
-            if bpp != 24:
-                raise ValueError("Only 24-bit BMPs are supported.")
+        # Calculate row size (including padding)
+        row_size = (width * 3 + 3) & ~3
 
-            row_size = (width * 3 + 3) & ~3
-            f.seek(pixel_offset)
-
-            raw_pixels = [None] * height
-            for y in reversed(range(height)):
-                row = [tuple(f.read(3)[::-1]) for _ in range(width)]
-                padding = row_size - width * 3
-                if padding:
-                    f.read(padding)
-                raw_pixels[y] = row
+        # Extract pixel data
+        raw_pixels = [None] * height
+        for y in range(height):
+            row_start = pixel_offset + y * row_size
+            row_end = row_start + width * 3
+            row = [
+                (data[i + 2], data[i + 1], data[i])  # Convert BGR to RGB
+                for i in range(row_start, row_end, 3)
+            ]
+            raw_pixels[height - y - 1] = row  # Flip vertically
 
         # Cache the raw image for future conversions
         previous_bmps[(filename)] = raw_pixels
 
-    width, height = len(raw_pixels[0]), len(raw_pixels)
-
     # Skip resize if dimensions match or are not provided
     if not target_width or not target_height or (target_width == width and target_height == height):
-        resized_bmps[cache_key] = raw_pixels
+        # resized_bmps[cache_key] = raw_pixels
         return raw_pixels
-
     # Resize logic
     resized = []
-
     # If scaling down, we skip pixels
     if target_width < width or target_height < height:
         for y in range(target_height):
@@ -73,20 +90,15 @@ def read_bmp_rgb_array(filename, target_width=None, target_height=None, cachedOn
                 row.append(raw_pixels[src_y][src_x])
             resized.append(row)
     
-    # If scaling up, we duplicate pixels
     else:
+        # If scaling up, we interpolate by duplicating pixels via mapping, not manually
         for y in range(target_height):
             src_y = int(y * height / target_height)
             row = []
             for x in range(target_width):
                 src_x = int(x * width / target_width)
                 row.append(raw_pixels[src_y][src_x])
-                
-                # If scaling up, duplicate the pixel
-                if width < target_width:
-                    row.append(raw_pixels[src_y][src_x])  # Repeat pixel horizontally
             resized.append(row)
-
     # Cache the resized image for future requests
     cache_key = (filename, target_width, target_height)
     resized_bmps[cache_key] = resized
@@ -141,9 +153,9 @@ class Application():
         instance.thread = None
         instance.apps = _apps(instance)
         return instance;
-    def preprocessImages(self, image_paths, waitForCompletion=False, onComplete=None):
+    def preprocessImages(self, image_paths, waitForCompletion=False, onComplete=None, height=None, width=None, imagesObject=None):
         executor = ThreadPoolExecutor()
-        futures = [executor.submit(read_bmp_rgb_array, path) for path in image_paths]
+        futures = [executor.submit(read_bmp_rgb_array, path, target_width=width, target_height=height, imagesObject=imagesObject) for path in image_paths]
 
         if waitForCompletion:
             for future in futures:
@@ -377,6 +389,7 @@ class _ui:
             "geo": instance.geo,
             "colour": instance.colour,
             "clearFrames": clearFrames,
+            "stamp": time.time(),
             "drawAlways": drawAlways,
             "components": [],
             "onCloseFunc": lambda: exitAppIfNoWin(parent, instance),
@@ -439,8 +452,8 @@ class _ui:
             self.ofsprog = callback
             # synchronize the callback with the system UI
         print(f"Hooking event '{event}' with callback {callback} for window: {self.parent.package}")
-            
-    def Image(self, path="luke.bmp", height=None, width=None, cachedOnly=False):
+
+    def Image(self, path="luke.bmp", width=None, height=None, cachedOnly=False):
         element_id = len(self.nUiObject["components"])
         bmparray = None
         if path == "" or path is None:

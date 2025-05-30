@@ -1,4 +1,4 @@
-import Libraries.nsys as nsys, json, importlib.util, hashlib, tkinter, tkinter.ttk, time, threading;
+import Libraries.nsys as nsys, json, importlib.util, hashlib, tkinter, tkinter.ttk, time, threading, os;
 from permissions import PermissionSubsystem
 from Drivers.surfaceDriver import SurfaceDriver as sd
 from Fonts.PY.vt323 import charmap as CHARACTER_MAP
@@ -332,8 +332,9 @@ def launcher(session, args):
             try:
                 app_spec = importlib.util.spec_from_file_location(
                     name=app_id.replace(".", ""),
-                    location=f"./applications/{app_id}/__init__.py"
+                    location=os.path.abspath(f"applications/{app_id}/__init__.py")
                 )
+                
                 app_module = importlib.util.module_from_spec(app_spec)
                 app_spec.loader.exec_module(app_module)
                 return app_module.self
@@ -509,15 +510,13 @@ def drawAppWin(elem):
         elem["fbak"] = None
     elem["frameCount"] += 1
     return "Done"
-def renderFunction(framebuf, frame, width, height, eventgetter=None):
-    global windows, dragging, drag_offset, dragged_element_index, mouse_was_pressed, mouse_pressed, cDragWin, id, hasStartedId, focus
-    id.poll(eventgetter)
-    # rag(framebuf, frame, width, height)
-    surface.fill_screen((138, 207, 0))
 
+def handleMouseInput(e):
+    global windows, dragging, drag_offset, dragged_element_index, mouse_was_pressed, mouse_pressed, cDragWin, id, hasStartedId, focus, fbw, fbh
+    height = fbh
+    width =fbw
     mouse_buttons = id.get_mouse_buttons()
     mouse_x, mouse_y = id.get_mouse_position()
-
     if mouse_buttons[0]:
         if not dragging:
             for i, elem in enumerate(windows + sysUI):
@@ -630,6 +629,25 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
         dragged_element_index = None
         mouse_was_pressed = False
         cDragWin = None    # Draw windows using correct NumPy indexing [y, x]
+    
+
+fbw = None
+fbh = None
+fbc = None
+fbuf = None
+def renderFunction(framebuf, frame, width, height, eventgetter=None):
+    global fbc, fbuf, windows, dragging, drag_offset, dragged_element_index, mouse_was_pressed, mouse_pressed, cDragWin, id, hasStartedId, focus, fbw, fbh
+    fbw = width
+    fbh = height
+    fbc = frame
+    fbuf = framebuf
+    id.poll(eventgetter)
+    # rag(framebuf, frame, width, height)
+    surface.fill_screen((138, 207, 0))
+
+    mouse_x, mouse_y = id.get_mouse_position()
+
+
     # keyboard event handling
     wsysui = windows + sysUI
     for elem in wsysui:
@@ -692,7 +710,20 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
         if "fixed" in elem and elem["fixed"]:
             framebuf[y:y+h, x:x+w] = elem["fbuf"]
         else:
-            framebuf[y:y+elem["fbuf"].shape[0], x:x+elem["fbuf"].shape[1]] = elem["fbuf"]  # Draw the component buffer onto the main frame buffer
+            # framebuf[y:y+elem["fbuf"].shape[0], x:x+elem["fbuf"].shape[1]] = elem["fbuf"][:y+elem["fbuf"].shape[0], :x+elem["fbuf"].shape[1]]  # Draw the component buffer onto the main frame buffer
+            # Sizes
+            fh, fw = (height, width)  # framebuf height & width
+            eh, ew = (int(eval(str(elem["fbuf"].shape[0]))), int(eval(str(elem["fbuf"].shape[1]))))  # element height & width
+
+            # Compute the actual height and width we can draw without overflow
+            h2 = min(eh, fh - y)
+            print(h2, eh, fh)
+            w2 = min(ew, fw - x)
+            print(w2, ew, fw)
+
+            # Clip only if within framebuf bounds
+            if h2 > 0 and w2 > 0:
+                framebuf[y:y+h2, x:x+w2] = elem["fbuf"][:h2, :w2]
         if "fixed" not in elem or not elem["fixed"]:
             framebuf[y:y+25, x:x+w] = (255, 255, 255)
             surface.draw_text(framebuf, title, title_x, title_y-5, (0, 0, 0), pixel_multiplier=1.2, width=w-30, height=25)
@@ -719,6 +750,13 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
 
 surface = sd.Bitmap(1366, 768, "", callback=renderFunction, font=CHARACTER_MAP)
 id.hook_event(id.events.KEYDOWN, handleInputs)
+def loopIS():
+    while True:
+        handleMouseInput(None)
+def mkf():
+    while True:
+
+threading.Thread(target=loopIS, daemon=True).start()
 from sysApps import taskbar
 def authloop():
     try:
