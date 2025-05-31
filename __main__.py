@@ -1,4 +1,4 @@
-import Libraries.nsys as nsys, json, importlib.util, hashlib, tkinter, tkinter.ttk, time, threading, os;
+import Libraries.nsys as nsys, json, hashlib, time, threading;
 from permissions import PermissionSubsystem
 from Drivers.surfaceDriver import SurfaceDriver as sd
 from Fonts.PY.vt323 import charmap as CHARACTER_MAP
@@ -40,128 +40,6 @@ def overlay_image(base, overlay, pos_x, pos_y):
             if 0 <= base_y < base_height and 0 <= base_x < base_width:
                 # Copy the pixel from the overlay to the base
                 base[base_y][base_x] = overlay[y][x]
-previous_bmps = {}  # Cache for raw BMPs (conversion stage)
-resized_bmps = {}  # Cache for resized images
-def read_bmp_rgb_arrayOLD(filename, target_width=None, target_height=None):
-    cache_key = (filename, target_width, target_height)
-    if cache_key in previous_bmps:
-        return previous_bmps[cache_key]
-
-    with open(filename, "rb") as f:
-        f.seek(10)
-        pixel_offset = int.from_bytes(f.read(4), "little")
-
-        f.seek(18)
-        width = int.from_bytes(f.read(4), "little")
-        height = int.from_bytes(f.read(4), "little")
-
-        f.seek(28)
-        bpp = int.from_bytes(f.read(2), "little")
-        if bpp != 24:
-            raise ValueError("Only 24-bit BMPs are supported.")
-
-        row_size = (width * 3 + 3) & ~3
-        f.seek(pixel_offset)
-
-        raw_pixels = [None] * height
-        for y in reversed(range(height)):
-            row = [tuple(f.read(3)[::-1]) for _ in range(width)]
-            padding = row_size - width * 3
-            if padding:
-                f.read(padding)
-            raw_pixels[y] = row
-
-    # Skip resize if dimensions match or are not provided
-    if not target_width or not target_height or (target_width == width and target_height == height):
-        previous_bmps[cache_key] = raw_pixels
-        return raw_pixels
-
-    # Nearest-neighbor resize
-    resized = []
-    for y in range(target_height):
-        src_y = int(y * height / target_height)
-        row = []
-        for x in range(target_width):
-            src_x = int(x * width / target_width)
-            row.append(raw_pixels[src_y][src_x])
-        resized.append(row)
-
-    previous_bmps[cache_key] = resized
-    return resized
-
-def read_bmp_rgb_array(filename, target_width=None, target_height=None):
-    # Check if the raw BMP data is cached
-    cache_key = (filename, target_width, target_height)
-    if cache_key in resized_bmps:
-        return resized_bmps[cache_key]
-
-    # Check if the raw BMP data is already cached for the image without resizing
-    raw_pixels = previous_bmps.get((filename, None, None))
-    if not raw_pixels:
-        with open(filename, "rb") as f:
-            f.seek(10)
-            pixel_offset = int.from_bytes(f.read(4), "little")
-
-            f.seek(18)
-            width = int.from_bytes(f.read(4), "little")
-            height = int.from_bytes(f.read(4), "little")
-
-            f.seek(28)
-            bpp = int.from_bytes(f.read(2), "little")
-            if bpp != 24:
-                raise ValueError("Only 24-bit BMPs are supported.")
-
-            row_size = (width * 3 + 3) & ~3
-            f.seek(pixel_offset)
-
-            raw_pixels = [None] * height
-            for y in reversed(range(height)):
-                row = [tuple(f.read(3)[::-1]) for _ in range(width)]
-                padding = row_size - width * 3
-                if padding:
-                    f.read(padding)
-                raw_pixels[y] = row
-
-        # Cache the raw image for future conversions
-        previous_bmps[(filename, None, None)] = raw_pixels
-
-    width, height = len(raw_pixels[0]), len(raw_pixels)
-
-    # Skip resize if dimensions match or are not provided
-    if not target_width or not target_height or (target_width == width and target_height == height):
-        resized_bmps[cache_key] = raw_pixels
-        return raw_pixels
-
-    # Resize logic
-    resized = []
-
-    # If scaling down, we skip pixels
-    if target_width < width or target_height < height:
-        for y in range(target_height):
-            src_y = int(y * height / target_height)
-            row = []
-            for x in range(target_width):
-                src_x = int(x * width / target_width)
-                row.append(raw_pixels[src_y][src_x])
-            resized.append(row)
-    
-    # If scaling up, we duplicate pixels
-    else:
-        for y in range(target_height):
-            src_y = int(y * height / target_height)
-            row = []
-            for x in range(target_width):
-                src_x = int(x * width / target_width)
-                row.append(raw_pixels[src_y][src_x])
-                
-                # If scaling up, duplicate the pixel
-                if width < target_width:
-                    row.append(raw_pixels[src_y][src_x])  # Repeat pixel horizontally
-            resized.append(row)
-
-    # Cache the resized image for future requests
-    resized_bmps[cache_key] = resized
-    return resized
 focus = (None, "Unset")
 
 def getTopWinForPos(x, y):
@@ -193,13 +71,6 @@ def getTopWinForPos(x, y):
             return sysUICanidates[len(sysUICanidates)-1], "sysui"
         else:
             return None, None
-
-def wait_until(somepredicate, timeout, period=0.25, *args, **kwargs):
-  mustend = time.time() + timeout
-  while time.time() < mustend:
-    if somepredicate: return True
-    time.sleep(period)
-  return False
 
 def handleInputs(event):
     hasReturned = False
@@ -326,31 +197,12 @@ def launcher(session, args):
         app_id = app['id']
         app_name = app['name']
         # print(f'{app_id}: {app_name}')
-        
-        # Create new frame for the app and buttons
-        def load_app_info(app_id):
-            try:
-                app_spec = importlib.util.spec_from_file_location(
-                    name=app_id.replace(".", ""),
-                    location=os.path.abspath(f"applications/{app_id}/__init__.py")
-                )
-                
-                app_module = importlib.util.module_from_spec(app_spec)
-                app_spec.loader.exec_module(app_module)
-                return app_module.self
-            except Exception as e:
-                nsys.log(f"Error loading app info for {app_id}: {e}")
-                return None
-        
-        app_instance = load_app_info(app_id)
+
         
         def launch_app(app_id=app_id):
-            # Only launch basic apps via AppSession
-            app_instance = load_app_info(app_id)
-            # Launch basic apps normally
             app_ses = nsys.AppSession(app_id, session)
-            app_ses.exec()
             onCloseLauncher()
+            app_ses.exec()
 
         # Create button based on app type
         launcherWin['components'].append({"type": "button", "text":app_name, "on_click": launch_app, "border":(0,0,0), "bg":(250,250,250),"colour":(0,0,0)})
@@ -359,7 +211,6 @@ def launcher(session, args):
     arg = args.split(", ")
     if(arg[0] == "test"):
         app_id = arg[1]
-        app_instance = load_app_info(app_id)
         # Launch basic apps normally
         app_ses = nsys.AppSession(app_id, session)
         app_ses.exec()
@@ -409,6 +260,8 @@ def drawAppWin(elem):
             i = None
             compi = None
             if type == "window":
+                if elem not in windows:
+                    windows.append(elem)
                 i = windows.index(elem)
                 compi = windows[i]["components"].index(comp)
                 if (compi > 0 and "bbox" in windows[i]["components"][compi-1]) and "pos" not in comp:
@@ -635,6 +488,14 @@ fbw = None
 fbh = None
 fbc = None
 fbuf = None
+def frameDrawNew():
+    global fbc, fbuf, fbw, fbh
+    width = fbw 
+    height = fbh
+    frame = fbc
+    framebuf = fbuf
+
+
 def renderFunction(framebuf, frame, width, height, eventgetter=None):
     global fbc, fbuf, windows, dragging, drag_offset, dragged_element_index, mouse_was_pressed, mouse_pressed, cDragWin, id, hasStartedId, focus, fbw, fbh
     fbw = width
@@ -648,7 +509,6 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
     mouse_x, mouse_y = id.get_mouse_position()
 
 
-    # keyboard event handling
     wsysui = windows + sysUI
     for elem in wsysui:
         type = "window"
@@ -694,14 +554,14 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
         if "renderthread" not in elem or ("renderthread" in elem and elem["renderthread"] == None):
             if (("cbak" in elem and elem["cbak"] != elem ["components"]) or "cbak" not in elem) or (("fbak" in elem and "focus" in elem and elem["fbak"] != elem ["focus"]) or "fbak" not in elem) or (("indexbak" in elem and elem["indexbak"] != wsysui.index(elem)) or "indexbak" not in elem) or ("drawAlways" in elem and elem["drawAlways"]):
                 elem["indexbak"] = wsysui.index(elem)
-                elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=False)
+                elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=True)
                 elem["renderthread"].start()
                 if "firstFrameComplete" not in elem:
                     if "waitFirstDraw" in elem and elem["waitFirstDraw"]:
                         if elem["renderthread"] != None:
                             elem["renderthread"].join()
                         else:
-                            elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=False)
+                            elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=True)
                             elem["renderthread"].start()
                             if elem["renderthread"] != None:
                                 elem["renderthread"].join()
@@ -717,9 +577,9 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
 
             # Compute the actual height and width we can draw without overflow
             h2 = min(eh, fh - y)
-            print(h2, eh, fh)
+            # print(h2, eh, fh)
             w2 = min(ew, fw - x)
-            print(w2, ew, fw)
+            # print(w2, ew, fw)
 
             # Clip only if within framebuf bounds
             if h2 > 0 and w2 > 0:
@@ -753,8 +613,6 @@ id.hook_event(id.events.KEYDOWN, handleInputs)
 def loopIS():
     while True:
         handleMouseInput(None)
-def mkf():
-    while True:
 
 threading.Thread(target=loopIS, daemon=True).start()
 from sysApps import taskbar

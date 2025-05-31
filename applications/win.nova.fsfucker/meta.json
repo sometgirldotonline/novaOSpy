@@ -1,9 +1,0 @@
-{
-    "name": "Fsfucker",
-    "id": "win.nova.fsfucker",
-    "version": "1.0.0",
-    "description": "Creates a filesystem object for the application to test the filesystem permissions.",
-    "developer": "Example Inc.",
-    "developer_website": "https://example.com",
-    "developer_email": "example@example.com"
-}

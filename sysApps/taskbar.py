@@ -1,6 +1,4 @@
-from Libraries import nsys
 from Libraries.nsys import sysUI
-from Drivers.surfaceDriver import SurfaceDriver
 from __main__ import launcher, systemSession, surface
 print(surface.width, surface.height)  
 sysUI.append({

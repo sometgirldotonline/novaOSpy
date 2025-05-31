@@ -1,15 +1,15 @@
-import tkinter.messagebox
+# import tkinter.messagebox
 from concurrent.futures import ThreadPoolExecutor
-import tkinter.scrolledtext
-import os, tkinter, tkinter.ttk, json, Libraries.nsys as nsys, random, string, platform;
+# import tkinter.scrolledtext
+import os, json, Libraries.nsys as nsys, random, string, platform;
 from permissions import PermissionSubsystem;
-import threading;
+# import threading;
 from Libraries.nsys import windows;
 import time
 from Libraries.nsys import sysUI;
 import numpy as np
 import struct
-from __main__ import resized_bmps, previous_bmps;
+# from __main__ import resized_bmps, previous_bmps;
 psys = PermissionSubsystem();
 global Application;
 # Initialize cache dictionaries for raw BMP data and resized images
@@ -80,25 +80,15 @@ def read_bmp_rgb_array(filename, target_width=None, target_height=None, cachedOn
         return raw_pixels
     # Resize logic
     resized = []
-    # If scaling down, we skip pixels
-    if target_width < width or target_height < height:
-        for y in range(target_height):
-            src_y = int(y * height / target_height)
-            row = []
-            for x in range(target_width):
-                src_x = int(x * width / target_width)
-                row.append(raw_pixels[src_y][src_x])
-            resized.append(row)
-    
-    else:
-        # If scaling up, we interpolate by duplicating pixels via mapping, not manually
-        for y in range(target_height):
-            src_y = int(y * height / target_height)
-            row = []
-            for x in range(target_width):
-                src_x = int(x * width / target_width)
-                row.append(raw_pixels[src_y][src_x])
-            resized.append(row)
+    for y in range(target_height):
+        src_y = int(y * height / target_height)
+        row = []
+        for x in range(target_width):
+            src_x = int(x * width / target_width)
+            row.append(raw_pixels[src_y][src_x])
+        resized.append(row)
+
+
     # Cache the resized image for future requests
     cache_key = (filename, target_width, target_height)
     resized_bmps[cache_key] = resized
@@ -188,7 +178,12 @@ class Application():
         if self.thread != None:
             self.thread.terminate()
     def exec(self, session, args):
+        print("Balls")
+        global windows
         self.session = session
+        global resized_bmps, previous_bmps
+        resized_bmps = {}
+        previous_bmps = {}
         if hasattr(self, "program") & (self.type == "basic"):
             self.program(session, args)
         elif hasattr(self, "startScript") and self.type == "scheduled":
@@ -197,9 +192,21 @@ class Application():
         else:
             return {"error": "No script set for this application", "reason":"NoScript"}
     def exitApp(self):
+        global resized_bmps, previous_bmps, windows
         # self.thread.terminate()
         self.session.exit()
-        print("EXIIT")
+        resized_bmps = None
+        del resized_bmps
+        previous_bmps = None
+        del previous_bmps
+        # For every window, unbind any events
+        for win in self.windows:
+            if hasattr(win, "ofsprog"):
+                try:
+                    win.ofsprog = None
+                except Exception as e:
+                    nsys.log(f"Error unbinding ofsprog for window {win.title}: {e}")
+
         for win in self.windows:
             windows.__delitem__(win.index)
             self.windows.remove(win)
@@ -211,6 +218,8 @@ class Application():
                 self.stop()
         else:
             raise TypeError("Invalid application type. Must be 'basic' or 'scheduled'.")
+        self = None
+        del self
     def ui(cls, geo=(200, 200), pos=(0, 0), colour=(220, 220, 220), title="", drawAlways=False, clearFrames=True):
         win = _ui(cls, geo=geo, pos=pos, colour=colour,title=title,drawAlways=drawAlways,clearFrames=clearFrames)
         cls.windows.append(win);
@@ -259,6 +268,178 @@ class Application():
         return "Not Implemented"
     def uninstall(self):
         return psys.uninstallApp(self.id)
+
+class ImagePreprocessor():
+    def __init__(self, image_paths, target_width=None, target_height=None):
+        self.image_paths = image_paths
+        self.target_width = target_width
+        self.target_height = target_height
+        self.resized_bmps = {}
+        self.previous_bmps = {}
+        self.currentFrame = 0
+    def _preprocessor(self, filename, target_width=None, target_height=None, cachedOnly=False, imagesObject=None):
+        # Check if the raw BMP data is cached
+        resized_bmps = self.resized_bmps
+        previous_bmps = self.previous_bmps
+        cache_key = (filename)
+        if cachedOnly:
+            # If cachedOnly is True, return None if not found in cache, check filename only
+            if cache_key not in previous_bmps:
+                print(f"Image {filename} not found in cache.")
+                return None
+        cache_key = (filename, target_width, target_height)
+        if cache_key in resized_bmps:
+            return resized_bmps[cache_key]
+        # Check if the raw BMP data is already cached for the image without resizing
+        with open(filename, "rb") as f:
+            data = f.read()  # Read the entire file into memory
+        if (filename) in previous_bmps:
+            print("Using initial cache")
+            raw_pixels = previous_bmps[(filename)]
+            width = len(previous_bmps[(filename)][0])
+            height = len(previous_bmps[(filename)])
+        else:
+            # Parse BMP header
+            pixel_offset = struct.unpack_from("<I", data, 10)[0]
+            width = struct.unpack_from("<I", data, 18)[0]
+            height = struct.unpack_from("<I", data, 22)[0]
+            bpp = struct.unpack_from("<H", data, 28)[0]
+
+            if bpp != 24:
+                raise ValueError("Only 24-bit BMPs are supported.")
+
+            # Calculate row size (including padding)
+            row_size = (width * 3 + 3) & ~3
+
+            # Extract pixel data
+            raw_pixels = [None] * height
+            for y in range(height):
+                row_start = pixel_offset + y * row_size
+                row_end = row_start + width * 3
+                row = [
+                    (data[i + 2], data[i + 1], data[i])  # Convert BGR to RGB
+                    for i in range(row_start, row_end, 3)
+                ]
+                raw_pixels[height - y - 1] = row  # Flip vertically
+
+            # Cache the raw image for future conversions
+            previous_bmps[(filename)] = raw_pixels
+
+        # Skip resize if dimensions match or are not provided
+        if not target_width or not target_height or (target_width == width and target_height == height):
+            # resized_bmps[cache_key] = raw_pixels
+            return raw_pixels
+        # Resize logic
+        resized = []
+        # If scaling down, we skip pixels
+        if target_width < width or target_height < height:
+            for y in range(target_height):
+                src_y = int(y * height / target_height)
+                row = []
+                for x in range(target_width):
+                    src_x = int(x * width / target_width)
+                    row.append(raw_pixels[src_y][src_x])
+                resized.append(row)
+        
+        else:
+            # If scaling up, we interpolate by duplicating pixels via mapping, not manually
+            for y in range(target_height):
+                src_y = int(y * height / target_height)
+                row = []
+                for x in range(target_width):
+                    src_x = int(x * width / target_width)
+                    row.append(raw_pixels[src_y][src_x])
+                resized.append(row)
+        # Cache the resized image for future requests
+        cache_key = (filename, target_width, target_height)
+        resized_bmps[cache_key] = resized
+        return resized
+
+    def clearNFirstImages(self, n):
+        # Clear the first n Images from both caches, set to None rather than deleting to keep indexing
+        if n < 0 or n > len(self.image_paths):
+            raise ValueError("n must be between 0 and the number of images in image_paths.")
+        for i in range(n):
+            path = self.image_paths[i]
+            cache_key = (path, self.target_width, self.target_height)
+            if cache_key in self.resized_bmps:
+                self.resized_bmps[cache_key] = None
+            if path in self.previous_bmps:
+                self.previous_bmps[path] = None
+    def clearPreviousFrames(self):
+        # Clear all frames before the current frame, from both caches, set to None rather than deleting to keep indexing
+        for i in range(self.currentFrame):
+            path = self.image_paths[i]
+            cache_key = (path, self.target_width, self.target_height)
+            if cache_key in self.resized_bmps:
+                self.resized_bmps[cache_key] = None
+            if path in self.previous_bmps:
+                self.previous_bmps[path] = None
+    def cacheAheadImages(self, ahead=10, waitForCompletion=False):
+        # Cache n images ahead of the current frame
+        if self.currentFrame + ahead >= len(self.image_paths):
+            ahead = len(self.image_paths) - self.currentFrame - 1
+        for i in range(self.currentFrame, self.currentFrame + ahead):
+            path = self.image_paths[i]
+            executor = ThreadPoolExecutor()
+            futures = [executor.submit(self._preprocessor, path, target_width=self.target_width, target_height=self.target_height) for path in self.image_paths]
+            if waitForCompletion:
+                for future in futures:
+                    future.result()  # ensures completion
+    def cacheOneFrameAhead(self):
+        # Cache the next frame image
+        if self.currentFrame + 1 < len(self.image_paths):
+            path = self.image_paths[self.currentFrame + 1]
+            self._preprocessor(path, target_width=self.target_width, target_height=self.target_height)
+        else:
+            print("No more frames to cache ahead.")
+    def cacheFrame(self, frame):
+        # Cache a specific frame image
+        if frame < len(self.image_paths):
+            path = self.image_paths[frame]
+            self._preprocessor(path, target_width=self.target_width, target_height=self.target_height)
+        else:
+            print(f"Frame {frame} is out of range. Total frames: {len(self.image_paths)}")
+    def clearAllCaches(self):
+        # Clear both caches
+        self.resized_bmps = {}
+        self.previous_bmps = {}
+        print("All caches cleared.")
+    def cacheAllImages(self, waitForCompletion=False):
+        # Cache all images in the image_paths list
+        executor = ThreadPoolExecutor()
+        futures = [executor.submit(self._preprocessor, path, target_width=self.target_width, target_height=self.target_height) for path in self.image_paths]
+        if waitForCompletion:
+            for future in futures:
+                future.result()
+    def advanceFrameCount(self):
+        # Increment the current frame count
+        if self.currentFrame < len(self.image_paths) - 1:
+            self.currentFrame += 1
+            print(f"Advanced to frame {self.currentFrame}.")
+        else:
+            print("Already at the last frame.")
+    def setFrameCount(self, frame):
+        # Set the current frame count to a specific value
+        if 0 <= frame < len(self.image_paths):
+            self.currentFrame = frame
+            print(f"Set current frame to {self.currentFrame}.")
+        else:
+            print(f"Frame {frame} is out of range. Total frames: {len(self.image_paths)}")
+    def getCurrentFrameCount(self):
+        # Get the current frame count
+        return self.currentFrame
+    def getCurrentFrameImage(self):
+        # Get the image for the current frame from the cache
+        if 0 <= self.currentFrame < len(self.image_paths):
+            return self.resized_bmps.get((self.image_paths[self.currentFrame], self.target_width, self.target_height))
+        else:
+            print("Current frame is out of range.")
+            return None
+    def getFrameImage(self, frame):
+        # Get the image for a specific frame from the cache
+        if 0 <= frame < len(self.image_paths):
+            return self.resized_bmps.get((self.image_paths[frame], self.target_width, self.target_height))
 
 class _generators:
     def num(min, max):
@@ -416,7 +597,8 @@ class _ui:
         try:
             self.ofsprog(self, fc)
         except Exception as e:
-            nsys.log(f"Error in onFrameStart: {e}")
+            pass
+            # nsys.log(f"Error in onFrameStart: {e}")
     def Label(self, text="Unset Value", size=12, colour=(0, 0, 0)):
         # Add a label component to the JSON
         element_id = len(self.nUiObject["components"])
@@ -507,7 +689,8 @@ class _ui:
 
     def basicAsk(cls, prompt="Enter a value:", default_value="", callback=None):
         # Create a new dialog window in the JSON
-        dialog_id = len(sysUI)
+        global windows
+        dialog_id = len(windows)
         dialog_json = {
             "type": "dialog",
             "title": "Input Dialog",
@@ -540,15 +723,15 @@ class _ui:
                 }
             ]
         }
-        sysUI.append(dialog_json)
+        windows.append(dialog_json)
 
         # Assign the on_click function to the "OK" button
         def runCallback():
-            sysUI.pop(dialog_id, None)
+            windows.pop(dialog_id, None)
             if callable(callback):
                 callback(sysUI[dialog_id]["components"][1]["value"])
 
-        sysUI[dialog_id]["components"][2]["on_click"] = runCallback
+        windows[dialog_id]["components"][2]["on_click"] = runCallback
 
 
 class uiElTemplate:
@@ -565,6 +748,9 @@ class uiElTemplate:
                 arr = read_bmp_rgb_array(value, self.parent.nUiObject["components"][self.element_id]["width"], self.parent.nUiObject["components"][self.element_id]["height"], cachedOnly=self.parent.nUiObject["components"][self.element_id].get("cachedOnly", False))
                 if arr != None:
                     self.parent.nUiObject["components"][self.element_id]["image"] = arr
+            elif self.parent.nUiObject["components"][self.element_id]["type"] == "image" and key == "bitmap":
+                if value != None:
+                    self.parent.nUiObject["components"][self.element_id]["image"] = value
             else:
                 self.parent.nUiObject["components"][self.element_id][key] = value
         return self

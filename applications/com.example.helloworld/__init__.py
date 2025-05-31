@@ -1,33 +1,36 @@
-print("Hello World application loaded")
 from applications import basicapplib;
-from Libraries.nsys import id
-import time, math, time
 win = None
 im = None
 imgf = 0
 def onFrameDraw(win2, frameCount):
     global win, im, imgf
     if win is not None and im is not None:
-        im.set({"path": f"anim/Try2/{imgf}.bmp"})
+        # ip.clearPreviousFrames()
+        im.set({"bitmap": ip.getCurrentFrameImage()})
+        # ip.cacheAheadImages(ahead=20)  # Cache ahead to ensure smooth playback
+        ip.advanceFrameCount()
         imgf += 1
-        if imgf >= 120:  # 50 because we have 50 images from 00 to 49
+        if imgf >= 120:
+            # ip.clearAllCaches()
+            ip.setFrameCount(0)
             imgf = 0
-        # win.nUiObject["indexbak"] = "balls"
-        # win.nUiObject["cbak"] = "balls"
 def main(session, args=[]):
-    s = 250
+    print("Hello World application loaded")
     global win, im
     win = self.ui(geo=(s,s), clearFrames=True, drawAlways=False)
     im = win.Image(height=s, width=s, path="luke.bmp")
     win.set(title="Loading...")
-    self.preprocessImages([f"anim/Try2/{i}.bmp" for i in range(120)], waitForCompletion=True, height=s, width=s)
+    # self.preprocessImages([f"anim/Try2/{i}.bmp" for i in range(120)], waitForCompletion=True, height=s, width=s)
+    # ip.cacheAheadImages(ahead=20, waitForCompletion=True)  # Preprocess and cache images ahead
+    ip.cacheAllImages(waitForCompletion=True)  # Preprocess all images
     print("Images preprocessed")
     win.set(clearFrames=False)
     win.set(drawAlways=True)
     win.set(title="Playing")
-    im.set({"cachedOnly": True})
+    # im.set({"cachedOnly": True})
     win.hookEvent("onFrameStart", onFrameDraw)
-    # txt = win.Label()
 import os
-self = basicapplib.Application(app_folder=os.path.dirname(os.path.realpath(__file__)))
+s = 250
+ip = basicapplib.ImagePreprocessor([f"anim/Try2/{i}.bmp" for i in range(120)], target_height=s, target_width=s)
+self = basicapplib.Application(app_folder="com.example.helloworld")
 self.setScript(kind="main", program=main)

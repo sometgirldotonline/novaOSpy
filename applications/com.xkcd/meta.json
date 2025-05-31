@@ -1,0 +1,9 @@
+{
+        "name": "Xkcd Reader",
+    "id": "com.xkcd",
+    "version": "1.0.0",
+    "description": "Shows today's XKCD.",
+    "developer": "Nova",
+    "developer_website": "https://novafurry.win",
+    "developer_email": "nova@novafurry.win"
+}

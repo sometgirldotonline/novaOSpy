@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 import os
 import json
-import tkinter;
+# import tkinter;
 class PermissionSubsystem:
     def __init__(self, xml_file="apps.xml"):
         self.xml_file = xml_file

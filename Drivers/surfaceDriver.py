@@ -21,7 +21,7 @@ cgmap = {
     "9": "nine",
     "!": "exclam",
     "@": "at",
-    "#": "hash",
+    "#": "numbersign",
     "$": "dollar",
     "%": "percent",
     "^": "caret",
