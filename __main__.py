@@ -1,12 +1,14 @@
-import Libraries.nsys as nsys, json, hashlib, time, threading;
+import Libraries.nsys as nsys
+import json, hashlib, time, threading;
 from permissions import PermissionSubsystem
-from Drivers.surfaceDriver import SurfaceDriver as sd
+from Drivers.surfaceDriverSdlPyg import SurfaceDriver as sd
 from Fonts.PY.vt323 import charmap as CHARACTER_MAP
 from Fonts.PY.mdi import charmap as icons
 import numpy as np
-from Libraries.nsys import windows
+from Libraries.nsys import AppSession, windows
 from Libraries.nsys import sysUI
 from Libraries.nsys import id
+from Drivers.surfaceDriverSdlPyg import overlayfb
 systemVersion = "0.0.1"
 nsys.log(f"NovaOS {systemVersion} booting on " + nsys.getsysinfo())
 nsys.sysState.set(nsys.sysState.Booting)
@@ -23,23 +25,37 @@ hasStartedId = False
 drag_offset = (0, 0)
 dragged_element_index = None
 def overlay_image(base, overlay, pos_x, pos_y):
+    # Convert the overlay to a NumPy array if it's not already
+    overlay_np = np.array(overlay, dtype=object)
+
+    # Create a mask to identify valid pixels (tuples that are not (0, 0, 0))
+    valid_mask = np.vectorize(lambda pixel: isinstance(pixel, tuple) and pixel != (0, 0, 0))(overlay_np)
+
     # Get the dimensions of the base and overlay images
-    base_height = len(base)
-    base_width = len(base[0])
-    overlay_height = len(overlay)
-    overlay_width = len(overlay[0])
+    base_height, base_width, _ = base.shape
+    overlay_height, overlay_width,_ = overlay_np.shape
 
-    # Iterate over the overlay image
-    for y in range(overlay_height):
-        for x in range(overlay_width):
-            # Calculate the position in the base image
-            base_y = pos_y + y
-            base_x = pos_x + x
+    # Calculate the region of interest (ROI) in the base image
+    y_start = max(0, pos_y)
+    y_end = min(base_height, pos_y + overlay_height)
+    x_start = max(0, pos_x)
+    x_end = min(base_width, pos_x + overlay_width)
 
-            # Check if the position is within the bounds of the base image
-            if 0 <= base_y < base_height and 0 <= base_x < base_width:
-                # Copy the pixel from the overlay to the base
-                base[base_y][base_x] = overlay[y][x]
+    # Calculate the corresponding region in the overlay
+    overlay_y_start = max(0, -pos_y)
+    overlay_y_end = overlay_y_start + (y_end - y_start)
+    overlay_x_start = max(0, -pos_x)
+    overlay_x_end = overlay_x_start + (x_end - x_start)
+
+    # Extract the regions of interest
+    base_roi = base[y_start:y_end, x_start:x_end]
+    overlay_roi = overlay_np[overlay_y_start:overlay_y_end, overlay_x_start:overlay_x_end]
+    valid_mask_roi = valid_mask[overlay_y_start:overlay_y_end, overlay_x_start:overlay_x_end]
+
+    # Apply the valid mask to copy only valid pixels from the overlay to the base
+    base_roi[valid_mask_roi] = overlay_roi[valid_mask_roi]
+    return base_roi
+
 focus = (None, "Unset")
 
 def getTopWinForPos(x, y):
@@ -108,7 +124,7 @@ def handleInputs(event):
                         strarray.__delitem__(pos)
                         input["value"] = ''.join(strarray)
         elif event.key == id.keys.RETURN:
-            print(f"Return pressed, value: {input['value']}")
+            #print(f"Return pressed, value: {input['value']}")
             if "on_return" in input:
                 input["on_return"](input["value"], windows[-1], windows[-1]["components"].index(input))
             hasReturned = True
@@ -119,7 +135,7 @@ def handleInputs(event):
             if "cursor" in input and (input["cursor"] < len(input["value"])-1):
                 input["cursor"] +=1;
         else:
-            print(f"Key pressed: {event.key}, unicode: {event.unicode}")
+            #print(f"Key pressed: {event.key}, unicode: {event.unicode}")
             if "value" in input:
                 if "cursor" in input:
                     pos = input["cursor"]+1
@@ -185,7 +201,7 @@ def launcher(session, args):
     def onMouseDown(event):
         # print(focus)
         mp = id.get_mouse_position()
-        if launcherWin and not (launcherWin["pos"][0] <= mp[0] <= launcherWin["pos"][0] + launcherWin["geo"][0] and launcherWin["pos"][1] <= mp[1] <= launcherWin["pos"][1] + launcherWin["geo"][1]):
+        if launcherWin in windows and not (launcherWin["pos"][0] <= mp[0] <= launcherWin["pos"][0] + launcherWin["geo"][0] and launcherWin["pos"][1] <= mp[1] <= launcherWin["pos"][1] + launcherWin["geo"][1]):
             print(f"Mouse down outside launcher at {mp}, closing launcher")
             onCloseLauncher()
     id.hook_event(id.events.MOUSEBUTTONDOWN, onMouseDown)
@@ -402,7 +418,7 @@ def handleMouseInput(e):
                     if mouse_pressed[0]:  # Index 0 corresponds to the left mouse button
                         if not mouse_was_pressed:
                             # This block runs only when the button is pressed for the first time
-                            print("Mouse clicked!")
+                            #print("Mouse clicked!")
                             is_within_close_x = (x+w)-23 <= mouse_x < (x+w)-3
                             is_within_close_y = y+3 <= mouse_y < y+19
 
@@ -429,22 +445,22 @@ def handleMouseInput(e):
                                             cw = 0
                                             ch = 0
                                         if comp_x <= mouse_x <= comp_x + cw and comp_y <= mouse_y <= comp_y + ch:
-                                            print(f"Mouse clicked in a component")
+                                            #print(f"Mouse clicked in a component")
                                             elem["focus"] = elem["components"].index(comp) if "components" in elem else None
                                             if(comp["type"] == "button"):
-                                                print(f"Button {comp['text']} clicked!")
+                                                #print(f"Button {comp['text']} clicked!")
                                                 # Handle button click here
                                                 if "on_click" in comp:
                                                     comp["on_click"]()
                                                 button_clicked = True
                                                 break
                                             elif(comp["type"] == "input"):
-                                                print(f"Input clicked!")
+                                                #print(f"Input clicked!")
                                                 if "on_click" in comp:
                                                     comp["on_click"]()
                                                 break
                                         else:
-                                            print(f"Mouse clicked outside of components")
+                                            #print(f"Mouse clicked outside of components")
                                             elem["focus"] = None
                                 # Only start dragging if not clicking a button and we are within the top 25px of the window
                                 if not button_clicked and y <= mouse_y <= y + 25:
@@ -497,7 +513,7 @@ def frameDrawNew():
 
 
 def renderFunction(framebuf, frame, width, height, eventgetter=None):
-    global fbc, fbuf, windows, dragging, drag_offset, dragged_element_index, mouse_was_pressed, mouse_pressed, cDragWin, id, hasStartedId, focus, fbw, fbh
+    global fbc, fbuf, windows, dragging, drag_offset, dragged_element_index, mouse_was_pressed, mouse_pressed, cDragWin, id, hasStartedId, focus, fbw, fbh, overlayfb
     fbw = width
     fbh = height
     fbc = frame
@@ -605,7 +621,7 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
     cy = max(0, min(mouse_y, height - size)) # Height is for y-coordinate bounds
     # for i in range (5):
     #     surface.draw_circle(framebuf, cx, cy, i*10,i*10)
-    surface.draw_fchar(framebuf, "cursor", cx, cy, (0, 0, 0), pixel_multiplier=1, font=CHARACTER_MAP)
+    surface.draw_fchar(framebuf, "cursor", cx, cy, (0,0,0), pixel_multiplier=1, font=CHARACTER_MAP)
 
 
 surface = sd.Bitmap(1366, 768, "", callback=renderFunction, font=CHARACTER_MAP)
@@ -637,7 +653,9 @@ def authloop():
         nsys.log()
         nsys.log("Exiting.")
 # check for arguments
+#nsys.args = ["b","test","com.example.helloworld"]
 print(nsys.args)
+
 if len(nsys.args) > 1:
     if nsys.args[1] == "test":
         nsys.log("Starting test mode. Module: " + nsys.args[2])
@@ -648,7 +666,9 @@ if len(nsys.args) > 1:
         systemSession.Authenticate("test", passhash=hashlib.md5(b"test").hexdigest(), sessionType=3)
         print(systemSession)
         time.sleep(1)
-        systemSession.exec(launcher, appfolder="", arguments="test, "+nsys.args[2])
+        #systemSession.exec(print(), appfolder=nsys.args[2], arguments="test, "+nsys.args[2])
+        testAppSession = AppSession(nsys.args[2],systemSession)
+        testAppSession.exec("test")
     else:
         authloop()
 else:

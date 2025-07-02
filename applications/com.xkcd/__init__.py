@@ -15,10 +15,11 @@ def main(session, args=[]):
         if img_response.status_code == 200:
             with open("xkcd.bmp", "wb") as f:
                 f.write(img_response.content)
-            res = subprocess.run(["convert", "xkcd.bmp", "-depth", "24", "-define", "bmp:format=rgb565", "xkcd_565.bmp"])
+            res = subprocess.run(["convert", "xkcd.bmp", "--depth", "24", "-define", "bmp:format=rgb565", "xkcd_565.bmp"])
             print(res)
             win.Image("xkcd_565.bmp", width=490, height=400)
             win.Label(f"{comic_data['alt']}")
+            win.set(drawAlways=True, clearFrames=False)
         else:
             win.Label("Failed to load xkcd comic image.")
         # Convert comic image to a 24 Bit RGB 565 BMP Image using "convert" command

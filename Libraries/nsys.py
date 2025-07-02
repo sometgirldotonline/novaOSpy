@@ -1,7 +1,8 @@
-import os, json, traceback, hashlib, importlib, platform, sys, threading
+import os, json, traceback, hashlib, importlib, platform, sys, threading, time
 from Drivers.inputDriver import InputDriver as id
+import numpy as np
 id = id()
-args = sys.argv
+args = sys.argv.copy()
 if __name__ == "__main__":
     print("Do not run this script! You should run the system python file (__main__.py) instead.")
     sys.exit()
@@ -127,15 +128,22 @@ def refresh():
         return False
 
 def showAuthPopup(cls, minPriv: int = 3, username: str = False, appfolder: str = False, callback=None):
+        lwstamp =  time.time()    
         windows.append({
-    "title": "Authentication Required",
-    "pos": (69, 180),
-    "geo": (300, 500),
-    "colour": (220, 220, 220),
-    "components": [
-    ]
-})
+            "title": "Authentication Required",
+            "pos": (69, 180),
+            "geo": (300, 500),
+            "colour": (220, 220, 220),
+            "clearFrames": True,
+            # "drawAlways": True,
+            "components": [
+            ],
+            "stamp":lwstamp
+        })
         loginwindow = windows[-1]
+        wstd = {item["stamp"]: item for item in windows}
+        loginwindow = wstd.get(lwstamp)
+        print(loginwindow == windows[-1])
         if appfolder:
             loginwindow["components"].append({"type": "text", "text": str(appfolder) + " requested raised session permissions to " + Users.profileTypeNames()[minPriv] + ".\nEnter your credentials to proceed.", "colour": (100, 100, 150)},)
         else:
@@ -288,8 +296,8 @@ class AppSession:
             app_module = importlib.util.module_from_spec(app_spec)
             app_spec.loader.exec_module(app_module)
             app_instance = app_module.self
-            app_thread = threading.Thread(target=app_instance.exec, args=(cls, arguments), daemon=True)
-            app_thread.start()
+            cls.app_thread = threading.Thread(target=app_instance.exec, args=(cls, arguments), daemon=False)
+            cls.app_thread.start()
         except PermissionError as e:
             print("Running " + appfolder +  " failed with PermissionError: " + str(e))
             args = json.loads(str(e.args[0]))

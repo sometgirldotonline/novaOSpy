@@ -143,7 +143,7 @@ class SurfaceDriver:
 
         # --- Optimized drawing helper methods ---
         @staticmethod
-        def draw_rect(framebuf, x, y, w, h, colour):
+        def draw_rect(framebuf, x, y, w, h, colour=(255, 255, 255)):
             """
             Draw a filled rectangle using slicing.
             Note: framebuf is assumed to have shape (height, width, 3)

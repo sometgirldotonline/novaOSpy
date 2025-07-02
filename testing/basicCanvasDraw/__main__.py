@@ -1,6 +1,9 @@
 import pygame
+import sdl
 import numpy as np
 from font_array import charmap as CHARACTER_MAP
+from threading import Thread
+ls = (0,0)
 
 class SurfaceDriver:
     def __init__(self, width=800, height=600, title="NovaOS BMP SurfaceDriver Window", callback=None):
@@ -19,11 +22,12 @@ class SurfaceDriver:
         self.callback = callback
 
         # Set up the display
-        self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
+        self.screen = pygame.display.set_mode((self.width, self.height),pygame.RESIZABLE)
         pygame.display.set_caption(self.title)
 
         # Create a numpy array for raw pixel data (RGB format)
-        self.pixel_data = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        # Fix: pygame expects (width, height, 3) not (height, width, 3)
+        self.pixel_data = np.zeros((self.width, self.height, 3), dtype=np.uint8)
 
         # Running state
         self.running = True
@@ -43,20 +47,45 @@ class SurfaceDriver:
         """
         Main loop for the SurfaceDriver.
         """
+        global ls
         frame = 0  # Frame counter for animation
         while self.running:
+            # Handle Pygame events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    self.running = False
+                    self.running = False  # Fix: was True, should be False
+                    sdl.stop_event.set()  # Signal SDL threads to stop
                 elif event.type == pygame.VIDEORESIZE:
-                    # Handle window resizing
                     self.width, self.height = event.w, event.h
                     self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
-                    self.pixel_data = np.zeros((event.w, event.h, 3), dtype=np.uint8)
+                    # Always allocate pixel_data as (height, width, 3)
+                    pygame.display.update()
+                    self.pixel_data = np.zeros((self.width, self.height, 3), dtype=np.uint8)  # Correct NumPy order: (height, width, 3)
+                    # If a callback is provided, use it to update the pixel data
+                    if self.callback:
+                        # Note: we pass width and height in the conventional order (width first, then height)
+                        self.callback(self.pixel_data, frame)                # If a callback is provided, use it to update the pixel data
 
+            # Get events from the sdl.py - call only once per loop
+            event = sdl.get_event()
+            if event is not None:
+                print(f"Processing event: {event}")
+                
+                if event.get("event") == "resize":
+                    print("Socket resize event:", event["width"], "x", event["height"])
+                    self.width, self.height = event["width"], event["height"]
+                    self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
+                    # Fix: correct dimensions for pygame
+                    self.pixel_data = np.zeros((self.width, self.height, 3), dtype=np.uint8)
+                
+                # Clear the event after processing
+                sdl.clear_event()
+            if ls != (self.width, self.height):
+                ls = (self.width, self.height);
             # If a callback is provided, use it to update the pixel data
             if self.callback:
                 self.callback(self.pixel_data, frame)
+
 
             # Create a surface from the pixel data
             surface = pygame.surfarray.make_surface(self.pixel_data)
@@ -68,6 +97,15 @@ class SurfaceDriver:
             # Increment the frame counter
             frame += 1
 
+            # Send the current frame to SDL socket
+            # Resize pixel_data to match SDL dimensions if needed
+            # if self.pixel_data.shape[:2] != (sdl.HEIGHT, sdl.WIDTH):
+            #     # Simple nearest neighbor resize for demonstration
+            #     import cv2
+            #     resized_frame = cv2.resize(self.pixel_data, (sdl.WIDTH, sdl.HEIGHT))
+            #     sdl.send_frame(resized_frame)
+            # else:
+            Thread(target=sdl.send_frame,args=[self.pixel_data.copy()],daemon=True).start()
             # Limit the frame rate to 60 FPS
             self.clock.tick(60)
 
@@ -77,491 +115,129 @@ class SurfaceDriver:
 def render_animated_gradient(pixel_data, frame):
     """
     Render a gradient that dynamically fills the screen based on the current dimensions of pixel_data.
-    :param pixel_data: The numpy array representing the pixel data.
-    :param frame: The current frame number (used for animation).
     """
-    height, width, _ = pixel_data.shape  # Correctly extract height (Y) and width (X)
+    # Fix: pygame uses (width, height, 3) format
+    width, height, _ = pixel_data.shape
 
-    # Use NumPy's vectorised operations to calculate the gradient
-    x = np.arange(width)  # Array of x-coordinates (horizontal axis)
-    y = np.arange(height)[:, None]  # Array of y-coordinates (vertical axis, as a column vector)
+    # Create a more visible gradient pattern
+    for x in range(width):
+        for y in range(height):
+            # Create a more dramatic gradient that's easy to see
+            r = int((x / width * 255 + frame) % 256)
+            g = int((y / height * 255 + frame) % 256)  
+            b = int(((x + y) / (width + height) * 255 + frame) % 256)
+            pixel_data[x, y] = (r, g, b)
+    
+    # Debug: Print some pixel values
+    # if frame % 60 == 0:  # Every second at 60fps
+    #     print(f"🎨 Gradient sample: pixel_data[10,10] = {pixel_data[10,10] if width > 10 and height > 10 else 'N/A'}")
 
-    # Calculate the gradient for each colour channel
-    pixel_data[:, :, 0] = (x + frame) % 256  # Red channel changes with x (horizontal) and frame
-    pixel_data[:, :, 1] = (y + frame) % 256  # Green channel changes with y (vertical) and frame
-    pixel_data[:, :, 2] = (x + y + frame) % 256  # Blue channel changes with x, y, and frame
 def draw_hello(pixel_data, frame):
     """
     Draw "Hello" as pixels on the screen, with line wrapping and support for missing characters.
     """
-    # Clear the screen
-    pixel_data[:, :] = (0, 0, 0)
-    render_animated_gradient(pixel_data=pixel_data, frame=frame)
-    # Define the character map
-    CHARACTER_MAP1 = {
-        'H': [
-            "1001",
-            "1001",
-            "1111",
-            "1001",
-            "1001",
-        ],
-        'e': [
-            "111",
-            "100",
-            "111",
-            "100",
-            "111",
-        ],
-        'l': [
-            "1",
-            "1",
-            "1",
-            "1",
-            "1",
-        ],
-        'o': [
-            "1111",
-            "1001",
-            "1001",
-            "1001",
-            "1111",
-        ],
-        ' ': [
-            "0",
-            "0",
-            "0",
-            "0",
-            "0",
-        ],
-        'z': [
-            "11010",
-            "11001",
-            "00001",
-            "11001",
-            "11010",
-        ],
-        'missing': [
-            "11111",
-            "10001",
-            "10101",
-            "10001",
-            "11111",
-        ]
-    }
-    CHARACTER_MAP2 = {
-        'A': [
-            "0100",
-            "1010",
-            "1110",
-            "1010",
-            "1010",
-        ],
-        'B': [
-            "1110",
-            "1010",
-            "1100",
-            "1010",
-            "1110",
-        ],
-        'C': [
-            "110",
-            "100",
-            "100",
-            "100",
-            "110",
-        ],
-        'D': [
-            "1100",
-            "1010",
-            "1010",
-            "1010",
-            "1100",
-        ],
-        'E': [
-            "1110",
-            "1000",
-            "1100",
-            "1000",
-            "1110",
-        ],
-        'F': [
-            "1110",
-            "1000",
-            "1100",
-            "1000",
-            "1000",
-        ],
-        'G': [
-            "1110",
-            "1000",
-            "1010",
-            "1010",
-            "1100",
-        ],
-        'H': [
-            "1010",
-            "1010",
-            "1110",
-            "1010",
-            "1010",
-        ],
-        'I': [
-            "10",
-            "10",
-            "10",
-            "10",
-            "10",
-        ],
-        'J': [
-            "010",
-            "010",
-            "010",
-            "010",
-            "100",
-        ],
-        'K': [
-            "1010",
-            "1010",
-            "1100",
-            "1010",
-            "1010",
-        ],
-        'L': [
-            "100",
-            "100",
-            "100",
-            "100",
-            "110",
-        ],
-        'M': [
-            "11010",
-            "10101",
-            "10101",
-            "10101",
-            "10101",
-        ],
-        'N': [
-            "1100",
-            "1010",
-            "1010",
-            "1010",
-            "1010",
-        ],
-        'O': [
-            "1110",
-            "1010",
-            "1010",
-            "1010",
-            "1110",
-        ],
-        'P': [
-            "1110",
-            "1010",
-            "1110",
-            "1000",
-            "1000",
-        ],
-        'Q': [
-            "1110",
-            "1010",
-            "1010",
-            "1010",
-            "1010",
-            "0100",
-        ],
-        'R': [
-            "1110",
-            "1010",
-            "1100",
-            "1010",
-            "1010",
-        ],
-        'S': [
-            "1110",
-            "1000",
-            "1110",
-            "0010",
-            "1110",
-        ],
-        'T': [
-            "1110",
-            "0100",
-            "0100",
-            "0100",
-            "0100",
-        ],
-        'U': [
-            "1010",
-            "1010",
-            "1010",
-            "1010",
-            "1110",
-        ],
-        'V': [
-            "1010",
-            "1010",
-            "1010",
-            "1010",
-            "0100",
-        ],
-        'W': [
-            "10101",
-            "10101",
-            "10101",
-            "10101",
-            "01010",
-        ],
-        'X': [
-            "1010",
-            "1010",
-            "0100",
-            "1010",
-            "1010",
-        ],
-        'Y': [
-            "1010",
-            "1010",
-            "1010",
-            "0100",
-            "0100",
-        ],
-        'Z': [
-            "1110",
-            "0010",
-            "0100",
-            "1000",
-            "1110",
-        ],
-        'a': [
-            "0110",
-            "1010",
-            "1010",
-            "0110",
-        ],
-        'b': [
-            "1000",
-            "1100",
-            "1010",
-            "1010",
-            "1100",
-        ],
-        'c': [
-            "0110",
-            "1000",
-            "1000",
-            "0110",
-        ],
-        'd': [
-            "0010",
-            "0110",
-            "1010",
-            "1010",
-            "0110",
-        ],
-        'e': [
-            "0100",
-            "1010",
-            "1110",
-            "1000",
-            "0100",
-        ],
-        'f': [
-            "010",
-            "100",
-            "110",
-            "100",
-            "100",
-        ],
-        'g': [
-            "0110",
-            "1010",
-            "1010",
-            "0010",
-            "1110",
-        ],
-        'h': [
-            "1000",
-            "1100",
-            "1010",
-            "1010",
-            "1010",
-        ],
-        'i': [
-            "10",
-            "00",
-            "10",
-            "10",
-            "10",
-        ],
-        'j': [
-            "010",
-            "000",
-            "010",
-            "010",
-            "010",
-            "100",
-        ],
-        'k': [
-            "1000",
-            "1010",
-            "1100",
-            "1010",
-            "1010",
-        ],
-        'l': [
-            "10",
-            "10",
-            "10",
-            "10",
-            "10",
-        ],
-        'm': [
-            "11010",
-            "10101",
-            "10101",
-            "10101",
-        ],
-        'n': [
-            "1100",
-            "1010",
-            "1010",
-            "1010",
-        ],
-        'o': [
-            "0100",
-            "1010",
-            "1010",
-            "0100",
-        ],
-        'p': [
-            "1100",
-            "1010",
-            "1010",
-            "1100",
-            "1000",
-        ],
-        'q': [
-            "0110",
-            "1010",
-            "1010",
-            "0110",
-            "0010",
-        ],
-        'r': [
-            "110",
-            "100",
-            "100",
-            "100",
-        ],
-        's': [
-            "1110",
-            "1000",
-            "0010",
-            "1110",
-        ],
-        't': [
-            "100",
-            "110",
-            "100",
-            "100",
-            "110",
-        ],
-        'u': [
-            "1010",
-            "1010",
-            "1010",
-            "0110",
-        ],
-        'v': [
-            "1010",
-            "1010",
-            "1010",
-            "0100",
-        ],
-        'w': [
-            "10101",
-            "10101",
-            "10101",
-            "01010",
-        ],
-        'x': [
-            "1010",
-            "0100",
-            "0100",
-            "1010",
-        ],
-        'y': [
-            "1010",
-            "1010",
-            "1010",
-            "0100",
-            "1000",
-        ],
-        'z': [
-            "11010",
-            "00100",
-            "01000",
-            "10110",
-        ],
-        ' ': [
-            "0",
-            "0",
-            "0",
-            "0",
-            "0",
-        ],
-    }
+    # Remove this line to preserve previous frame data:
+    # pixel_data[:, :] = (50, 50, 50)  # Dark gray background
+    
+    # Add the animated gradient (this will overwrite the entire frame)
+    render_animated_gradient(pixel_data, frame)
+    
+    # Add some bright test pixels to make sure something is visible
+    width, height, _ = pixel_data.shape
+    if width > 50 and height > 50:
+        # Draw a bright white square in the corner
+        pixel_data[10:30, 10:30] = (255, 255, 255)
+        # Draw a bright red square
+        pixel_data[40:60, 10:30] = (255, 0, 0)
+        # Draw a bright green square  
+        pixel_data[10:30, 40:60] = (0, 255, 0)
+        # Draw a bright blue square
+        pixel_data[40:60, 40:60] = (0, 0, 255)
 
-    # Text to draw
-    pixel_multiplier = 1 # Scale factor for each pixel
-    text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz"
-    x, y = 10, 10  # Starting position
-    spacing = 2  # Spacing between characters
-    colour = (255, 255, 255)  # Colour of the text
-    max_char_height = 5
-    for char in CHARACTER_MAP:
-        if len(char) > max_char_height:
-            max_char_height = len(char)*pixel_multiplier
-    max_char_height+=max_char_height+5;
-    # Starting cursor position
-    cursor_x = x
-    cursor_y = y
+    # Debug output
+    # if frame % 60 == 0:
+    #     print(f"🖼️  Frame {frame}: Drawing on {width}x{height} canvas")
+    #     print(f"🎯 Test squares: white={pixel_data[20,20]}, red={pixel_data[50,20]}")
 
-    # Iterate through each character in the text
-    for char in text:
-        if char in CHARACTER_MAP:
-            char_pixels = CHARACTER_MAP[char]
-        else:
-            char_pixels = CHARACTER_MAP['missing']
-        # Check if the character will exceed the screen width
-        char_width = len(char_pixels[0]) * pixel_multiplier + spacing * pixel_multiplier
-        if cursor_x + char_width > pixel_data.shape[0]:
-            # Wrap to the next line
-            cursor_x = x
-            cursor_y += max_char_height * pixel_multiplier  # Move down by the height of a character
+# Add a new function that only draws on specific areas without clearing
+def draw_selective(pixel_data, frame):
+    """
+    Draw only specific elements without clearing the background.
+    """
+    width, height, _ = pixel_data.shape
+    
+    # Only draw moving elements, leaving background intact
+    if width > 100 and height > 100:
+        # Moving white dot
+        dot_x = int((frame * 2) % (width - 20)) + 10
+        dot_y = int((frame * 1.5) % (height - 20)) + 10
+        
+        # Clear previous dot position by restoring gradient
+        if frame > 0:
+            prev_x = int(((frame - 1) * 2) % (width - 20)) + 10
+            prev_y = int(((frame - 1) * 1.5) % (height - 20)) + 10
+            for dx in range(-5, 6):
+                for dy in range(-5, 6):
+                    if 0 <= prev_x + dx < width and 0 <= prev_y + dy < height:
+                        # Restore gradient at previous position
+                        x, y = prev_x + dx, prev_y + dy
+                        r = int((x / width * 255 + frame) % 256)
+                        g = int((y / height * 255 + frame) % 256)  
+                        b = int(((x + y) / (width + height) * 255 + frame) % 256)
+                        pixel_data[x, y] = (r, g, b)
+        
+        # Draw new dot
+        for dx in range(-5, 6):
+            for dy in range(-5, 6):
+                if dx*dx + dy*dy <= 25 and 0 <= dot_x + dx < width and 0 <= dot_y + dy < height:
+                    pixel_data[dot_x + dx, dot_y + dy] = (255, 255, 255)
 
-        # Draw the character
-        for row_index, row in enumerate(char_pixels):
-            for col_index, pixel in enumerate(row):
-                if pixel == "1":
-                    # Scale the pixel horizontally and vertically
-                    for dy in range(pixel_multiplier):
-                        for dx in range(pixel_multiplier):
-                            # Check boundaries before writing
-                            if (
-                                cursor_y + row_index * pixel_multiplier + dy < pixel_data.shape[1]
-                                and cursor_x + col_index * pixel_multiplier + dx < pixel_data.shape[0]
-                            ):
-                                pixel_data[
-                                    cursor_x + col_index * pixel_multiplier + dx,
-                                    cursor_y + row_index * pixel_multiplier + dy,
-                                ] = colour
+def draw_hello_no_background(pixel_data, frame):
+    """
+    Draw without clearing background - preserves previous frame.
+    """
+    # Don't clear the background - comment out this line:
+    # pixel_data[:, :] = (50, 50, 50)  # Dark gray background
+    
+    # The gradient will still overwrite the entire frame
+    render_animated_gradient(pixel_data, frame)
+    
+    # Add some bright test pixels on top
+    width, height, _ = pixel_data.shape
+    if width > 50 and height > 50:
+        # Draw test squares on top of gradient
+        pixel_data[10:30, 10:30] = (255, 255, 255)
+        pixel_data[40:60, 10:30] = (255, 0, 0)
+        pixel_data[10:30, 40:60] = (0, 255, 0)
+        pixel_data[40:60, 40:60] = (0, 0, 255)
 
-        # Move the cursor to the right for the next character
-        cursor_x += len(char_pixels[0]) * pixel_multiplier + spacing * pixel_multiplier
+# For truly preserving previous frames, use this approach:
+def draw_overlay_only(pixel_data, frame):
+    """
+    Only draw specific overlay elements, preserving background.
+    """
+    width, height, _ = pixel_data.shape
+    
+    # Only draw small moving elements without touching the rest
+    if width > 100 and height > 100:
+        # Animated text position
+        text_x = int((frame * 0.5) % (width - 100)) + 50
+        text_y = height // 2
+        
+        # Draw a simple moving text indicator
+        for i in range(20):
+            for j in range(5):
+                if text_x + i < width and text_y + j < height:
+                    pixel_data[text_x + i, text_y + j] = (255, 255, 255)
+
+def red_screen(pixel_data, frame):
+    """
+    Fill the screen with a red colour.
+    """
+    pixel_data[:, :] = (255, 0, 0)  # Fill with red
+
 # Example usage
 if __name__ == "__main__":
-    # Create and run the SurfaceDriver
-    driver = SurfaceDriver(callback=draw_hello)
+    # Use the overlay-only version to preserve previous frames
+    driver = SurfaceDriver(width=400, height=300, callback=draw_hello)
     driver.run()
