@@ -5,3 +5,7 @@ __pycache__/
 .vscode
 Animold
 .vs/
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md

@@ -107,6 +107,12 @@ class Bitmap:
         max_y_position = y
         oci = 0
         cursorAtStart = False
+        newstring = ""
+        # Word wrapping
+        for line in lines:
+            line = line.split(" ")
+            for word in line:
+                # calculate word width
         if curpos == -1:
             curpos = None;
             cursorAtStart=True

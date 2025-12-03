@@ -4,6 +4,7 @@ import math
 from threading import Thread
 from Drivers import sdl
 from Drivers import shapeDriver
+from scipy.ndimage import label, find_objects
 import os
 overlayfb = np.zeros((768, 1366,3), dtype=np.uint8)
 os.environ["SDL_RENDER_VSYNC"] = "0"
@@ -197,7 +198,10 @@ class SurfaceDriver:
             Main loop for the SurfaceDriver.
             """
             frame = 0  # Frame counter for animation
+            self.surface = pygame.Surface((self.width, self.height))
             while self.running:
+                if not(hasattr(self, 'oldPD')):
+                    self.oldPD = np.zeros((self.height, self.width, 3), dtype=np.uint8)
                 eventgetter = pygame.event.get()
                 for event in eventgetter:
                     if event.type == pygame.QUIT:
@@ -223,7 +227,10 @@ class SurfaceDriver:
                         self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
                         # Fix: correct dimensions for pygame
                         pygame.display.update()
+                        self.surface = pygame.Surface((self.width, self.height))
                         self.pixel_data = np.zeros((self.height, self.width, 3), dtype=np.uint8)
+                        # On resize event:
+
                     
                     # Clear the event after processing
                     sdl.clear_event()
@@ -232,14 +239,31 @@ class SurfaceDriver:
                     # Pass width and height in the conventional order (width first, then height)
                     self.callback(self.pixel_data, frame, self.width, self.height, eventgetter=eventgetter)# Create a surface from the pixel data
                     # pygame.mouse.set_visible(False)
-                # Note: Pygame expects pixel data in a certain format - they might be transposing
-                # the array internally which could contribute to rotation issues
+                # diff = self.oldPD != self.pixel_data
+                # labeled, _ = label(diff)
+                # rects = find_objects(labeled)
+                # if len(rects) > 15:  # threshold = e.g. 10
+                #     surface = pygame.surfarray.make_surface(self.pixel_data.swapaxes(0,1))
+                #     self.screen.blit(surface, (0, 0))
+                # else:
+                #     for slices in rects:
+                #         ys, xs = slices[:2]
+                #         x = xs.start
+                #         y = ys.start
+                #         w = xs.stop - xs.start
+                #         h = ys.stop - ys.start
+                #         subarray = self.pixel_data[y:y+h, x:x+w]
+                #         surface = pygame.surfarray.make_surface(subarray.swapaxes(0,1))
+                #         self.screen.blit(surface, (x, y))
+                # pygame.display.flip()
+                # # Note: Pygame expects pixel data in a certain format - they might be transposing
+                # # the array internally which could contribute to rotation issues
                 Thread(target=overlay_image,args=[self.pixel_data, overlayfb, 0,0],daemon=True).start()
-                surface = pygame.surfarray.make_surface(self.pixel_data.swapaxes(0, 1))
-                # Blit the surface to the screen and update the display
-                self.screen.blit(surface, (0, 0))
+                pygame.surfarray.blit_array(self.surface, self.pixel_data.swapaxes(0, 1))
+                self.screen.blit(self.surface, (0, 0))
                 pygame.display.flip()
-                Thread(target=sdl.send_frame,args=[self.pixel_data.copy()],daemon=True).start()
+                # Thread(target=sdl.send_frame,args=[self.pixel_data.copy()],daemon=True).start()
+                self.oldPD = self.pixel_data.copy()
                 # Increment the frame counter
                 frame += 1
                 # Limit the frame rate to 60 FPS    

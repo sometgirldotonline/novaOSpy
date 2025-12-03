@@ -12,7 +12,7 @@ s = 250
 self = basicapplib.Application(app_folder="com.example.helloworld")
 
 # Create image preprocessor with correct path
-ip = basicapplib.ImagePreprocessor([f"Anim/Try2/{i}.bmp" for i in range(10)], target_height=s, target_width=s)
+ip = basicapplib.ImagePreprocessor([f"Anim/Try2/{i}.bmp" for i in range(119)], target_height=s, target_width=s)
 
 def onFrameDraw(win2, frameCount):
     global win, im, imgf
@@ -20,9 +20,8 @@ def onFrameDraw(win2, frameCount):
         # Get current frame image
         current_image = ip.getCurrentFrameImage()
         if current_image is not None:
-            print("fraem")
             im.set({"image": current_image})
-        # ip.cacheAheadImages(ahead=20)  # Cache ahead to ensure smooth playback
+        ip.cacheAheadImages(ahead=20)  # Cache ahead to ensure smooth playback
         ip.advanceFrameCount()
         imgf += 1
         if imgf >= 10:

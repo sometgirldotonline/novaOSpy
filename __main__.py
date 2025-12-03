@@ -25,36 +25,60 @@ hasStartedId = False
 drag_offset = (0, 0)
 dragged_element_index = None
 def overlay_image(base, overlay, pos_x, pos_y):
-    # Convert the overlay to a NumPy array if it's not already
-    overlay_np = np.array(overlay, dtype=object)
+    # Normalize overlay to a 3-channel uint8 numpy array if possible
+    overlay_np = np.array(overlay)
 
-    # Create a mask to identify valid pixels (tuples that are not (0, 0, 0))
-    valid_mask = np.vectorize(lambda pixel: isinstance(pixel, tuple) and pixel != (0, 0, 0))(overlay_np)
+    # We need a boolean mask of non-black pixels. Handle both common cases:
+    # - overlay is a numpy array of shape (h, w, 3) and dtype uint8
+    # - overlay is a list/array of tuples (r,g,b) (object dtype)
+    try:
+        # Fast path: numeric arrays (uint8 or similar)
+        if overlay_np.ndim == 3 and overlay_np.shape[2] == 3:
+            mask = np.any(overlay_np != 0, axis=-1)
+        else:
+            # Fallback to object handling below
+            raise ValueError
+    except Exception:
+        # Ensure we have a numeric array; convert list-of-tuples to numeric
+        try:
+            overlay_arr = np.array(overlay, dtype=np.uint8)
+            if overlay_arr.ndim == 3 and overlay_arr.shape[2] == 3:
+                overlay_np = overlay_arr
+                mask = np.any(overlay_np != 0, axis=-1)
+            else:
+                # Unexpected shape: no-op
+                return base
+        except Exception:
+            # If conversion fails, give up gracefully
+            return base
 
     # Get the dimensions of the base and overlay images
     base_height, base_width, _ = base.shape
-    overlay_height, overlay_width,_ = overlay_np.shape
+    overlay_height, overlay_width, _ = overlay_np.shape
 
-    # Calculate the region of interest (ROI) in the base image
+    # Calculate ROI in the base image
     y_start = max(0, pos_y)
     y_end = min(base_height, pos_y + overlay_height)
     x_start = max(0, pos_x)
     x_end = min(base_width, pos_x + overlay_width)
 
-    # Calculate the corresponding region in the overlay
+    # Corresponding region in the overlay
     overlay_y_start = max(0, -pos_y)
     overlay_y_end = overlay_y_start + (y_end - y_start)
     overlay_x_start = max(0, -pos_x)
     overlay_x_end = overlay_x_start + (x_end - x_start)
 
-    # Extract the regions of interest
+    # Extract ROIs
     base_roi = base[y_start:y_end, x_start:x_end]
     overlay_roi = overlay_np[overlay_y_start:overlay_y_end, overlay_x_start:overlay_x_end]
-    valid_mask_roi = valid_mask[overlay_y_start:overlay_y_end, overlay_x_start:overlay_x_end]
+    mask_roi = mask[overlay_y_start:overlay_y_end, overlay_x_start:overlay_x_end]
 
-    # Apply the valid mask to copy only valid pixels from the overlay to the base
-    base_roi[valid_mask_roi] = overlay_roi[valid_mask_roi]
-    return base_roi
+    # Apply mask: copy overlay pixels where mask is True
+    base_roi[mask_roi] = overlay_roi[mask_roi]
+
+    # Write back the modified ROI into the base and return
+    base[y_start:y_end, x_start:x_end] = base_roi
+    return base
 
 focus = (None, "Unset")
 
@@ -293,7 +317,7 @@ def drawAppWin(elem):
             if "colour" not in comp:
                 comp["colour"] = (0,0,0)
             if(comp["type"] == "text"):
-                if not hasattr(comp, "pixel_multiplier"):
+                if "pixel_multiplier" not in comp:
                     comp["pixel_multiplier"] = 1
                 comp_w = min(comp_w, w-25) if comp_w is not None else w-25
                 comp_h = min(comp_h, h-25) if comp_h is not None else h-25
@@ -653,7 +677,7 @@ def authloop():
         nsys.log()
         nsys.log("Exiting.")
 # check for arguments
-#nsys.args = ["b","test","com.example.helloworld"]
+nsys.args = ["b","test","online.sometgirl.readmereader"]
 print(nsys.args)
 
 if len(nsys.args) > 1:

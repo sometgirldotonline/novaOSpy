@@ -498,7 +498,7 @@ class ImagePreprocessor():
         # Get the image for the current frame from the cache
         if 0 <= self.currentFrame < len(self.image_paths):
             # print(self.resized_bmps.get((self.image_paths[self.currentFrame], self.target_width, self.target_height)))
-            print(self.myBitmaps)
+            # print(self.myBitmaps)
             return self.myBitmaps.get((md5_hash_file(self.image_paths[self.currentFrame]), self.target_width, self.target_height))
         else:
             print("Current frame is out of range.")
@@ -666,7 +666,6 @@ class _ui:
             self.nUiObject["clearFrames"] = clearFrames
     def onFrameStart(self, fc):
         # if our window (self) has a onFrameStart function, call it
-        print("Fraem Start")
         try:
             self.ofsprog(self, fc)
         except Exception as e:
@@ -682,7 +681,7 @@ class _ui:
         self.nUiObject["components"].append({
             "type": "text",
             "text": str(text),
-            "size": size,
+            "pixel_multiplier": size/12,
             "colour": colour
         })
 

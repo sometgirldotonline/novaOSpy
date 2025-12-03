@@ -22,5 +22,5 @@ def main(session, args=[]):
     print(time.time() - st)
     win.hookEvent("onFrameStart", ofd)
 import os
-self = basicapplib.Application(app_folder=os.path.dirname(os.path.realpath(__file__)))
+self = basicapplib.Application(app_folder="win.nova.st")
 self.setScript(kind="main", program=main)
