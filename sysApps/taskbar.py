@@ -5,7 +5,7 @@ sysUI.append({
     "title": "Taskbar",
     "pos": (0, "surface.height - 30"),
     "geo": ("surface.width", 30),
-    "colour": (50, 50, 50),
+    "colour": (113, 82, 168),
     "fixed": True,  # This window will not be draggable and has no title or border
     "components": [
         {"type": "button", "text": "Start", "colour": (100, 100, 150), "bg": (190, 190, 190), "border": (0, 0, 0), 

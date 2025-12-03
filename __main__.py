@@ -2,7 +2,7 @@ import Libraries.nsys as nsys
 import json, hashlib, time, threading;
 from permissions import PermissionSubsystem
 from Drivers.surfaceDriverSdlPyg import SurfaceDriver as sd
-from Fonts.PY.vt323 import charmap as CHARACTER_MAP
+from Fonts.PY.systemfont import charmap as CHARACTER_MAP
 from Fonts.PY.mdi import charmap as icons
 import numpy as np
 from Libraries.nsys import AppSession, windows
@@ -544,7 +544,7 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
     fbuf = framebuf
     id.poll(eventgetter)
     # rag(framebuf, frame, width, height)
-    surface.fill_screen((138, 207, 0))
+    surface.fill_screen((113, 135, 199))
 
     mouse_x, mouse_y = id.get_mouse_position()
 

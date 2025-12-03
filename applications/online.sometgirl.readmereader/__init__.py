@@ -41,7 +41,6 @@ def main(session, args=[]):
                     line = line.replace("<br>","")
             print(f"Printing: {line} with {multi}")
             win.Label(text=line,size=12*multi)
-    win.Label().set({"text": "Session type: "+str(session.type)});
 import os
 self = basicapplib.Application(app_folder="online.sometgirl.readmereader")
 self.setScript(kind="main", program=main)

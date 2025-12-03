@@ -831,3 +831,6 @@ charmap = {
     ]
 
 }
+
+def getfont():
+    return charmap

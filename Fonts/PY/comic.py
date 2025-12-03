@@ -13266,3 +13266,7 @@ charmap = {
         "00011000011",
     ],
 }
+
+
+def getfont():
+    return charmap

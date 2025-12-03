@@ -97,7 +97,7 @@ class Bitmap:
         max_letter_height = max(
         [len(font[c]) if c in font else len(font['missing']) for c in text if c != '\n']
         ) if any(c != '\n' for c in text) else 1
-        font[' '] = ["0" for x in range(max_letter_height)]
+        font[' '] = ["0" * 3 for x in range(max_letter_height)]
         text_max_height = int(math.ceil(max_letter_height * pixel_multiplier))
 
         cursor_x = x
@@ -108,15 +108,36 @@ class Bitmap:
         oci = 0
         cursorAtStart = False
         newstring = ""
-        # Word wrapping
+        wrap_width = width if width is not None else 200  # define a reasonable default
+
         for line in lines:
+            line_cursor_x = cursor_x
             line = line.split(" ")
             for word in line:
-                # calculate word width
+                wordWidth = 0
+                for char in word:
+                    if char in font:
+                        char_pixels = font[char]
+                    elif char in cgmap and cgmap[char] in font:
+                        char_pixels = font[cgmap[char]]
+                    else:
+                        char_pixels = font['missing']
+
+                    char_width = int(math.ceil(len(char_pixels[0]) * pixel_multiplier + spacing * pixel_multiplier))
+                    wordWidth += char_width
+                    if line_cursor_x + wordWidth > x + wrap_width:
+                        line_cursor_x = 0
+                        newstring += "\n"
+                wordWidth += 4
+                newstring += word + " "
+
+                line_cursor_x += wordWidth  # update cursor after adding word
+
+                
         if curpos == -1:
             curpos = None;
             cursorAtStart=True
-        for line in lines:
+        for line in newstring.split("\n"):
             line_cursor_x = cursor_x
             for char in line:
                 if char in font:
@@ -139,9 +160,9 @@ class Bitmap:
                 char_width = int(math.ceil(len(char_pixels_with_cursor[0]) * pixel_multiplier + spacing * pixel_multiplier))
                 
                 wrap_width = width if width is not None else pixel_data.shape[1]
-                if line_cursor_x + char_width > x + wrap_width or line_cursor_x + char_width > pixel_data.shape[1]:
-                    line_cursor_x = x
-                    cursor_y += text_max_height
+                # if line_cursor_x + char_width > x + wrap_width or line_cursor_x + char_width > pixel_data.shape[1]:
+                #     line_cursor_x = x
+                #     cursor_y += text_max_height
 
                 char_height_scaled = int(math.ceil(len(char_pixels_with_cursor) * pixel_multiplier))
                 top_padding = text_max_height - char_height_scaled

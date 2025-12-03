@@ -115917,3 +115917,5 @@ charmap = {
     "uni00A0": [
     ],
 }
+def getfont():
+    return charmap
