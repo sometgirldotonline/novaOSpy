@@ -137,7 +137,6 @@ def handle_command(command, args):
     elif command == "mouse" and len(args) == 2:
         x, y = map(int, args)
         print(f"[Command] Mouse event at {x},{y}")
-        # TODO: handle mouse event
     else:
         print(f"[Command] Unknown command: {command} {args}")
 

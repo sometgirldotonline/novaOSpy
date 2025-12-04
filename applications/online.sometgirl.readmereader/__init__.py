@@ -1,5 +1,5 @@
 from applications import basicapplib;
-from Drivers.surfaceDriverSdlPyg import overlayfb
+from Drivers.surfaceDriverpygOnly import overlayfb
 import time
 from pathlib import Path
 showRect = False
@@ -40,7 +40,7 @@ def main(session, args=[]):
                     line = line.replace(fmt["fmt"],"",1)
                     line = line.replace("<br>","")
             print(f"Printing: {line} with {multi}")
-            win.Label(text=line,size=12*multi)
+            win.Label(text=line.strip(),size=12*multi)
 import os
 self = basicapplib.Application(app_folder="online.sometgirl.readmereader")
 self.setScript(kind="main", program=main)

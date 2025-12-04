@@ -21,6 +21,8 @@ def show_error(self, *args):
 
 
 
+
+
 _sysStatus = 0
 _sysUser = ""
 _config = {}
@@ -250,7 +252,8 @@ class Session:
                 # Throw the error to the console like normal
                 raise e
         # if program ends in test mode, exit the system
-
+    def get_config():
+        return _config.get("users").get("cfg").copy()
 
 class AppSession:
     def __new__(cls, appfolder, parent):

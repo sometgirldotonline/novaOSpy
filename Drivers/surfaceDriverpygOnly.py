@@ -1,9 +1,11 @@
 import pygame
 import numpy as np
 import math
+from threading import Thread
 from Drivers import shapeDriver
+from scipy.ndimage import label, find_objects
 import os
-os.environ["SDL_RENDER_VSYNC"] = "0"
+overlayfb = np.zeros((768, 1366,3), dtype=np.uint8)
 # from systemfont import charmap as CHARACTER_MAP
 # Charecter to ttf glyph map for special chars like hyphen, letters are to be ignored for this list, do not include normal letters- its just the ones that you shift for or use accents on
 cgmap = {
@@ -54,6 +56,32 @@ cgmap = {
     "£": "pound",
     "€": "euro"
 }
+def overlay_image(base, overlay, pos_x, pos_y):
+    """
+    Overlays the `overlay` image onto the `base` image at position (pos_x, pos_y),
+    copying only non-black pixels using NumPy masking.
+    """
+    result = base
+
+    h, w, _ = overlay.shape
+
+    # Define the region of interest on the base image
+    end_x = min(pos_x + h, base.shape[0])
+    end_y = min(pos_y + w, base.shape[1])
+
+    roi = result[pos_x:end_x, pos_y:end_y]
+    overlay_crop = overlay[:end_x - pos_x, :end_y - pos_y]
+
+    # Create a mask for non-black pixels
+    mask = np.any(overlay_crop != [0, 0, 0], axis=-1)
+
+    # Apply the overlay using the mask
+    roi[mask] = overlay_crop[mask]
+
+    return result
+
+
+
 class SurfaceDriver:
     class Bitmap:
         def __init__(self, width=1280, height=720, title="NovaOS BMP SurfaceDriver Window", callback=None, font=None, shapeDrawer=shapeDriver.Bitmap):
@@ -69,7 +97,7 @@ class SurfaceDriver:
             self.width = width
             self.height = height
             self.title = title
-            self.rate = 60  # Default refresh rate
+            self.rate = 30  # Default refresh rate
             self.callback = callback
             pygame.mouse.set_visible(False)  # Hide the mouse cursor            # Set up the display
             self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE,  pygame.DOUBLEBUF | pygame.HWSURFACE)
@@ -145,7 +173,7 @@ class SurfaceDriver:
         def draw_rect(self, framebuf, x, y, w, h, colour=(255, 255, 255)):
             return self.shapeDrawer.draw_rect(framebuf,x,y,w,h,colour)
         def draw_border(self,x, y, w, h, border_colour=(255, 255, 255), thickness=3):
-            return self.shapeDrawer.draw_border(framebuf, x,y,w,h,border_colour, thickness)
+            return self.shapeDrawer.draw_border(self.pixel_data, x,y,w,h,border_colour, thickness)
         def draw_text(self,pixel_data, text, x, y, colour=(255, 255, 255), spacing=2, pixel_multiplier=1.0, font=None, width=None, height=None, curpos="balls"):
             if font == None:
                 font = self.font
@@ -168,7 +196,10 @@ class SurfaceDriver:
             Main loop for the SurfaceDriver.
             """
             frame = 0  # Frame counter for animation
+            self.surface = pygame.Surface((self.width, self.height))
             while self.running:
+                if not(hasattr(self, 'oldPD')):
+                    self.oldPD = np.zeros((self.height, self.width, 3), dtype=np.uint8)
                 eventgetter = pygame.event.get()
                 for event in eventgetter:
                     if event.type == pygame.QUIT:
@@ -188,13 +219,30 @@ class SurfaceDriver:
                     # Pass width and height in the conventional order (width first, then height)
                     self.callback(self.pixel_data, frame, self.width, self.height, eventgetter=eventgetter)# Create a surface from the pixel data
                     # pygame.mouse.set_visible(False)
-                # Note: Pygame expects pixel data in a certain format - they might be transposing
-                # the array internally which could contribute to rotation issues
-                surface = pygame.surfarray.make_surface(self.pixel_data.swapaxes(0, 1))
-                # Blit the surface to the screen and update the display
-                self.screen.blit(surface, (0, 0))
+                # diff = self.oldPD != self.pixel_data
+                # labeled, _ = label(diff)
+                # rects = find_objects(labeled)
+                # if len(rects) > 15:  # threshold = e.g. 10
+                #     surface = pygame.surfarray.make_surface(self.pixel_data.swapaxes(0,1))
+                #     self.screen.blit(surface, (0, 0))
+                # else:
+                #     for slices in rects:
+                #         ys, xs = slices[:2]
+                #         x = xs.start
+                #         y = ys.start
+                #         w = xs.stop - xs.start
+                #         h = ys.stop - ys.start
+                #         subarray = self.pixel_data[y:y+h, x:x+w]
+                #         surface = pygame.surfarray.make_surface(subarray.swapaxes(0,1))
+                #         self.screen.blit(surface, (x, y))
+                # pygame.display.flip()
+                # # Note: Pygame expects pixel data in a certain format - they might be transposing
+                # # the array internally which could contribute to rotation issues
+                Thread(target=overlay_image,args=[self.pixel_data, overlayfb, 0,0],daemon=True).start()
+                pygame.surfarray.blit_array(self.surface, self.pixel_data.swapaxes(0, 1))
+                self.screen.blit(self.surface, (0, 0))
                 pygame.display.flip()
-
+                self.oldPD = self.pixel_data.copy()
                 # Increment the frame counter
                 frame += 1
                 # Limit the frame rate to 60 FPS    

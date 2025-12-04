@@ -1,5 +1,5 @@
 from applications import basicapplib;
-from Drivers.surfaceDriverSdlPyg import overlayfb
+from Drivers.surfaceDriverpygOnly import overlayfb
 import time
 showRect = False
 # Define a function to run every frame

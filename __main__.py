@@ -1,14 +1,14 @@
 import Libraries.nsys as nsys
 import json, hashlib, time, threading;
 from permissions import PermissionSubsystem
-from Drivers.surfaceDriverSdlPyg import SurfaceDriver as sd
-from Fonts.PY.systemfont import charmap as CHARACTER_MAP
-from Fonts.PY.mdi import charmap as icons
+from Drivers.surfaceDriverpygOnly import SurfaceDriver as sd
+from Fonts.PY.autofont import getfont as getfontmap
+from Fonts.PY.mdi import getfont as geticons
 import numpy as np
 from Libraries.nsys import AppSession, windows
 from Libraries.nsys import sysUI
 from Libraries.nsys import id
-from Drivers.surfaceDriverSdlPyg import overlayfb
+from Drivers.surfaceDriverpygOnly import overlayfb
 systemVersion = "0.0.1"
 nsys.log(f"NovaOS {systemVersion} booting on " + nsys.getsysinfo())
 nsys.sysState.set(nsys.sysState.Booting)
@@ -16,6 +16,10 @@ nsys.log("state set to Booting")
 nsys.log("Loading permissions subsystem")
 permissions = PermissionSubsystem()
 nsys.log("Permissions subsystem loaded")
+CHARACTER_MAP = getfontmap()
+nsys.log("Loaded system font")
+icons = geticons()
+nsys.log("Loaded Icon Font")
 winthread = []
 mouse_was_pressed = False
 mouse_pressed = (False, False, False)
@@ -321,11 +325,10 @@ def drawAppWin(elem):
                     comp["pixel_multiplier"] = 1
                 comp_w = min(comp_w, w-25) if comp_w is not None else w-25
                 comp_h = min(comp_h, h-25) if comp_h is not None else h-25
-                t= surface.draw_text(elem["fbuf"], comp["text"], comp_x, comp_y-5, width=comp_w+comp_xo+20, height=comp_h, colour=comp["colour"], pixel_multiplier=comp["pixel_multiplier"])
+                t= surface.draw_text(elem["fbuf"], comp["text"], comp_x, comp_y, width=comp_w+comp_xo+20, height=comp_h, colour=comp["colour"], pixel_multiplier=comp["pixel_multiplier"])
                 comp["bbox"] = (comp_x, comp_y, t[1], t[0])  # Store the bounding box of the text
             elif(comp["type"] == "button"):
                 # use the previous components bbox for positioning offset if it exists, and if this element did not specify a position, so we can autmolatically position elements vertically, downwards
-
                 t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y)
                 if "geo" in comp:
                     cw = int(eval(str(comp["geo"][0])))
@@ -334,6 +337,7 @@ def drawAppWin(elem):
                     cw = t[1]+ 10
                     ch = t[0]+ 10
                                 # Top Border
+                ch += 10
                 cb=comp["border"]
                 elem["fbuf"][comp_y:comp_y+ch, comp_x:comp_x+cw] = comp["bg"]
                 elem["fbuf"][comp_y-2:comp_y, comp_x-2:comp_x+cw+2] = cb
@@ -343,7 +347,7 @@ def drawAppWin(elem):
                 elem["fbuf"][comp_y:comp_y+ch, comp_x-2:comp_x] = cb
                 # Right Border
                 elem["fbuf"][comp_y:comp_y+ch, comp_x+cw:comp_x+cw+2] = cb
-                t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y, colour=comp["colour"])
+                t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y +5, colour=comp["colour"])
                 comp["bbox"] = (comp_x, comp_y, cw, ch)
             elif(comp["type"] == "input"):
                 t = surface.draw_text(elem["fbuf"], comp["value"], comp_x+5,comp_y)
@@ -667,6 +671,7 @@ def authloop():
                 nsys.sysState.set(nsys.sysState.sysAuthenticated)
                 # Start the launcher
                 launcher(systemSession, "")
+                taskbar.showTaskbar(systemSession)
             systemSession.showAuthPopup(callback=onAuthenticate, appfolder="")
             print("salty")
             
@@ -677,7 +682,7 @@ def authloop():
         nsys.log()
         nsys.log("Exiting.")
 # check for arguments
-nsys.args = ["b","test","online.sometgirl.readmereader"]
+# nsys.args = ["b","test","online.sometgirl.readmereader"]
 print(nsys.args)
 
 if len(nsys.args) > 1:

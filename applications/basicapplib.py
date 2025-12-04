@@ -7,7 +7,6 @@ from permissions import PermissionSubsystem;
 from Libraries.nsys import windows;
 import time
 from Libraries.nsys import sysUI;
-from Drivers.surfaceDriverSdlPyg import overlayfb;
 import numpy as np
 import struct
 import hashlib
