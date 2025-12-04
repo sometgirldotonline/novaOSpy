@@ -339,14 +339,10 @@ def drawAppWin(elem):
                                 # Top Border
                 ch += 10
                 cb=comp["border"]
+                #border
+                elem["fbuf"][comp_y-2:comp_y+ch+2, comp_x-2:comp_x+cw+2] = cb
+                #bg
                 elem["fbuf"][comp_y:comp_y+ch, comp_x:comp_x+cw] = comp["bg"]
-                elem["fbuf"][comp_y-2:comp_y, comp_x-2:comp_x+cw+2] = cb
-                # bottom border
-                elem["fbuf"][comp_y+ch:comp_y+ch+2, comp_x-2:comp_x+cw+2] = cb
-                # Left Border
-                elem["fbuf"][comp_y:comp_y+ch, comp_x-2:comp_x] = cb
-                # Right Border
-                elem["fbuf"][comp_y:comp_y+ch, comp_x+cw:comp_x+cw+2] = cb
                 t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y +5, colour=comp["colour"])
                 comp["bbox"] = (comp_x, comp_y, cw, ch)
             elif(comp["type"] == "input"):
@@ -368,15 +364,9 @@ def drawAppWin(elem):
                         cb = (255, 255, 0)
                     else:
                         crs = None # if not focused, cursor is not shown
-                # Top Border
-                elem["fbuf"][comp_y-2:comp_y, comp_x-2:comp_x+cw+2] = cb
-                # bottom border
-                elem["fbuf"][comp_y+ch:comp_y+ch+2, comp_x-2:comp_x+cw+2] = cb
-                # Left Border
-                elem["fbuf"][comp_y:comp_y+ch, comp_x-2:comp_x+2] = cb
-                # Right Border
-                elem["fbuf"][comp_y:comp_y+ch, comp_x+cw:comp_x+cw+2] = cb
-                # 
+                #border
+                elem["fbuf"][comp_y-2:comp_y+ch+2, comp_x-2:comp_x+cw+2] = cb
+                #bg
                 elem["fbuf"][comp_y:comp_y+ch, comp_x:comp_x+cw] = comp["bg"]
                 colour = comp["colour"] if "colour" in comp else (0, 0, 0)
                 t = surface.draw_text(elem["fbuf"], comp["value"], comp_x+5,comp_y, curpos=crs, colour=colour)
