@@ -206,7 +206,6 @@ class Bitmap:
                                 if py < pixel_data.shape[0] and px < pixel_data.shape[1]:
                                     pixel_data[py, px] = colour
                 elif cursorAtStart and oci == 0:
-                    print("Drawing cursor at start")
                     # Draw the cursor at the start of the text, before the first character
                     cursor_x = line_cursor_x
                     cursor_y = y

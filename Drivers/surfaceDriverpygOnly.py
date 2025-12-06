@@ -99,6 +99,7 @@ class SurfaceDriver:
             self.title = title
             self.rate = 30  # Default refresh rate
             self.callback = callback
+            self.eventgetter =  pygame.event.get()
             pygame.mouse.set_visible(False)  # Hide the mouse cursor            # Set up the display
             self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE,  pygame.DOUBLEBUF | pygame.HWSURFACE)
             pygame.display.set_caption(self.title)
@@ -172,8 +173,8 @@ class SurfaceDriver:
             self.shapeDrawer.fill_screen(self.pixel_data,colour=colour)
         def draw_rect(self, framebuf, x, y, w, h, colour=(255, 255, 255)):
             return self.shapeDrawer.draw_rect(framebuf,x,y,w,h,colour)
-        def draw_border(self,x, y, w, h, border_colour=(255, 255, 255), thickness=3):
-            return self.shapeDrawer.draw_border(self.pixel_data, x,y,w,h,border_colour, thickness)
+        def draw_border(self,framebuf,x, y, w, h, border_colour=(255, 255, 255), thickness=3):
+            return self.shapeDrawer.draw_border(framebuf, x,y,w,h,border_colour, thickness)
         def draw_text(self,pixel_data, text, x, y, colour=(255, 255, 255), spacing=2, pixel_multiplier=1.0, font=None, width=None, height=None, curpos="balls"):
             if font == None:
                 font = self.font
@@ -201,6 +202,7 @@ class SurfaceDriver:
                 if not(hasattr(self, 'oldPD')):
                     self.oldPD = np.zeros((self.height, self.width, 3), dtype=np.uint8)
                 eventgetter = pygame.event.get()
+                self.eventgetter =  eventgetter
                 for event in eventgetter:
                     if event.type == pygame.QUIT:
                         self.running = False
@@ -246,7 +248,7 @@ class SurfaceDriver:
                 # Increment the frame counter
                 frame += 1
                 # Limit the frame rate to 60 FPS    
-                self.clock.tick(self.rate)
+                # self.clock.tick(self.rate)
             pygame.quit()
 
 

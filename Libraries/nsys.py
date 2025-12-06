@@ -154,7 +154,6 @@ def showAuthPopup(cls, minPriv: int = 3, username: str = False, appfolder: str =
         loginwindow["components"].append({"type": "text", "text": "Username", "colour": (100, 100, 150)})
         al = []
         def reloadAL(v, w, c):
-            print("Reloading")
             al = []
             if v in Users.getAllNames():
                 accessLvl = _config.get("users").get(v).get("kind")
@@ -212,9 +211,9 @@ class Session:
     def Authenticate(instance, username: str, passhash: str, sessionType: int = 3):
         userlist = Users.getAllNames()
         if username in userlist:
-            user = _config.get("users").get(username)
-            if user.get("pass") == passhash:
-                if user.get("kind") <= int(sessionType):
+            instance.usercfg = _config.get("users").get(username)
+            if instance.usercfg.get("pass") == passhash:
+                if instance.usercfg.get("kind") <= int(sessionType):
                     instance.user = username
                     instance.type = int(sessionType)
                     return instance
@@ -252,8 +251,10 @@ class Session:
                 # Throw the error to the console like normal
                 raise e
         # if program ends in test mode, exit the system
-    def get_config():
-        return _config.get("users").get("cfg").copy()
+    def get_config(self):
+        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        print(self.usercfg)
+        return self.usercfg.get("cfg").copy()
 
 class AppSession:
     def __new__(cls, appfolder, parent):

@@ -146,13 +146,11 @@ def handleInputs(event):
             if "value" in input:
                 if "cursor" in input:
                     pos = input["cursor"]+1
-                    # print(pos, input["value"], len(input["value"]))
                     if pos < len(input["value"]):
                         strarray = list(input["value"])
                         strarray.__delitem__(pos)
                         input["value"] = ''.join(strarray)
         elif event.key == id.keys.RETURN:
-            #print(f"Return pressed, value: {input['value']}")
             if "on_return" in input:
                 input["on_return"](input["value"], windows[-1], windows[-1]["components"].index(input))
             hasReturned = True
@@ -163,7 +161,6 @@ def handleInputs(event):
             if "cursor" in input and (input["cursor"] < len(input["value"])-1):
                 input["cursor"] +=1;
         else:
-            #print(f"Key pressed: {event.key}, unicode: {event.unicode}")
             if "value" in input:
                 if "cursor" in input:
                     pos = input["cursor"]+1
@@ -186,7 +183,6 @@ def handleInputs(event):
 registered_apps = permissions.list_applications()
 if len(registered_apps) == 0:
     for af in nsys.listapplications():
-        # print(af)
         if not af.startswith("__"):
             try:
                 with open(f"applications/{af}/meta.json") as f:
@@ -227,20 +223,17 @@ def launcher(session, args):
     # Create the launcher window
     # Hook the mousedown event to check if the click is outside the launcher window
     def onMouseDown(event):
-        # print(focus)
         mp = id.get_mouse_position()
         if launcherWin in windows and not (launcherWin["pos"][0] <= mp[0] <= launcherWin["pos"][0] + launcherWin["geo"][0] and launcherWin["pos"][1] <= mp[1] <= launcherWin["pos"][1] + launcherWin["geo"][1]):
-            print(f"Mouse down outside launcher at {mp}, closing launcher")
+            nsys.log(f"Mouse down outside launcher at {mp}, closing launcher",2)
             onCloseLauncher()
     id.hook_event(id.events.MOUSEBUTTONDOWN, onMouseDown)
     # Main apps frame
     launcherWin["components"].append({"type":"text", "text": "Apps"})
     registered_apps = permissions.list_applications()
     for app in registered_apps:
-        # print(app)
         app_id = app['id']
         app_name = app['name']
-        # print(f'{app_id}: {app_name}')
 
         
         def launch_app(app_id=app_id):
@@ -365,9 +358,9 @@ def drawAppWin(elem):
                     else:
                         crs = None # if not focused, cursor is not shown
                 #border
-                elem["fbuf"][comp_y-2:comp_y+ch+2, comp_x-2:comp_x+cw+2] = cb
+                surface.draw_border(elem["fbuf"],comp_x-2, comp_y-2, cw+4, ch+4, cb, 2)
                 #bg
-                elem["fbuf"][comp_y:comp_y+ch, comp_x:comp_x+cw] = comp["bg"]
+                surface.draw_rect(elem["fbuf"],comp_x, comp_y, cw, ch, comp["bg"])
                 colour = comp["colour"] if "colour" in comp else (0, 0, 0)
                 t = surface.draw_text(elem["fbuf"], comp["value"], comp_x+5,comp_y, curpos=crs, colour=colour)
                 comp["bbox"] = (comp_x, comp_y, cw, ch)
@@ -430,18 +423,15 @@ def handleMouseInput(e):
                         sysUI.append(sysUI.pop(sysUI.index(gtwfp)))
                         focus = (sysUI[-1], "sysui")
                 if x <= mouse_x <= x + w and y <= mouse_y <= y + h:
-                    # print(f"mouse_pressed: {mouse_pressed}, mouse_was_pressed: {mouse_was_pressed}")
                     mouse_pressed = id.get_mouse_buttons()
                     # Check if the left mouse button is pressed
                     if mouse_pressed[0]:  # Index 0 corresponds to the left mouse button
                         if not mouse_was_pressed:
                             # This block runs only when the button is pressed for the first time
-                            #print("Mouse clicked!")
                             is_within_close_x = (x+w)-23 <= mouse_x < (x+w)-3
                             is_within_close_y = y+3 <= mouse_y < y+19
 
                             if is_within_close_x & is_within_close_y:
-                                # print(f"mouse_pressed: {mouse_pressed}, mouse_was_pressed: {mouse_was_pressed}")
                                 if gtwfp != None and wt == "window":
                                     windows.remove(gtwfp)
                                     if "onCloseFunc" in gtwfp:
@@ -457,28 +447,23 @@ def handleMouseInput(e):
                                             cw = int(eval(str(comp["bbox"][2])))
                                             ch = int(eval(str(comp["bbox"][3])))
                                         else:
-                                            # print(comp)
                                             comp_x = int(eval(str(elem["pos"][0])))
                                             comp_y = int(eval(str(elem["pos"][1])))
                                             cw = 0
                                             ch = 0
                                         if comp_x <= mouse_x <= comp_x + cw and comp_y <= mouse_y <= comp_y + ch:
-                                            #print(f"Mouse clicked in a component")
                                             elem["focus"] = elem["components"].index(comp) if "components" in elem else None
                                             if(comp["type"] == "button"):
-                                                #print(f"Button {comp['text']} clicked!")
                                                 # Handle button click here
                                                 if "on_click" in comp:
                                                     comp["on_click"]()
                                                 button_clicked = True
                                                 break
                                             elif(comp["type"] == "input"):
-                                                #print(f"Input clicked!")
                                                 if "on_click" in comp:
                                                     comp["on_click"]()
                                                 break
                                         else:
-                                            #print(f"Mouse clicked outside of components")
                                             elem["focus"] = None
                                 # Only start dragging if not clicking a button and we are within the top 25px of the window
                                 if not button_clicked and y <= mouse_y <= y + 25:
@@ -531,7 +516,7 @@ def frameDrawNew():
 
 
 def renderFunction(framebuf, frame, width, height, eventgetter=None):
-    global fbc, fbuf, windows, dragging, drag_offset, dragged_element_index, mouse_was_pressed, mouse_pressed, cDragWin, id, hasStartedId, focus, fbw, fbh, overlayfb
+    global fbc, fbuf, windows, dragging, drag_offset, dragged_element_index, mouse_was_pressed, mouse_pressed, cDragWin, id, hasStartedId, focus, fbw, fbh, overlayfb, dmRunning
     fbw = width
     fbh = height
     fbc = frame
@@ -539,9 +524,10 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
     id.poll(eventgetter)
     # rag(framebuf, frame, width, height)
     surface.fill_screen((113, 135, 199))
-
     mouse_x, mouse_y = id.get_mouse_position()
-
+    if dmRunning == False:
+        threading.Thread(target=drawMouse, daemon=True).start()
+        
 
     wsysui = windows + sysUI
     for elem in wsysui:
@@ -549,7 +535,6 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
         if elem in sysUI:
             type = "sysui"
         # check if systems state is authenticated
-        # print(nsys.sysState.get() == nsys.sysState.awaitLogin)
         if nsys.sysState.get() == nsys.sysState.awaitLogin:
             if "showOnlyLoggedIn" in elem and elem["showOnlyLoggedIn"]:
                 break
@@ -588,17 +573,19 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
         if "renderthread" not in elem or ("renderthread" in elem and elem["renderthread"] == None):
             if (("cbak" in elem and elem["cbak"] != elem ["components"]) or "cbak" not in elem) or (("fbak" in elem and "focus" in elem and elem["fbak"] != elem ["focus"]) or "fbak" not in elem) or (("indexbak" in elem and elem["indexbak"] != wsysui.index(elem)) or "indexbak" not in elem) or ("drawAlways" in elem and elem["drawAlways"]):
                 elem["indexbak"] = wsysui.index(elem)
-                elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=True)
-                elem["renderthread"].start()
+                drawAppWin(elem)
+                # elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=True)
+                # elem["renderthread"].start()
                 if "firstFrameComplete" not in elem:
                     if "waitFirstDraw" in elem and elem["waitFirstDraw"]:
                         if elem["renderthread"] != None:
                             elem["renderthread"].join()
                         else:
-                            elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=True)
-                            elem["renderthread"].start()
-                            if elem["renderthread"] != None:
-                                elem["renderthread"].join()
+                            # elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=True)
+                            # elem["renderthread"].start()
+                            # if elem["renderthread"] != None:
+                                # elem["renderthread"].join()
+                            drawAppWin(elem)
                     elem["firstFrameComplete"] = True
                 
         if "fixed" in elem and elem["fixed"]:
@@ -611,9 +598,7 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
 
             # Compute the actual height and width we can draw without overflow
             h2 = min(eh, fh - y)
-            # print(h2, eh, fh)
             w2 = min(ew, fw - x)
-            # print(w2, ew, fw)
 
             # Clip only if within framebuf bounds
             if h2 > 0 and w2 > 0:
@@ -634,13 +619,18 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
             else:
                 framebuf[y+3:y+22,(x+w)-23:(x+w)-3] = (255,0,0)      # Normal red
             surface.draw_fchar(framebuf, "close", (x+w)-23, y+7, (0,0,0), font=icons, pixel_multiplier=0.95)    # Cursor (white square)
+dmRunning = False
+def drawMouse():
+    global id, fbw, fbh, dmRunning, fbuf
+    dmRunning = True
+    width = fbw
+    height = fbh
     size = 20
-    cx = max(0, min(mouse_x, width - size))  # Width is for x-coordinate bounds
-    cy = max(0, min(mouse_y, height - size)) # Height is for y-coordinate bounds
-    # for i in range (5):
-    #     surface.draw_circle(framebuf, cx, cy, i*10,i*10)
-    surface.draw_fchar(framebuf, "cursor", cx, cy, (0,0,0), pixel_multiplier=1, font=CHARACTER_MAP)
-
+    while True:
+        mouse_x, mouse_y = id.get_mouse_position()
+        cx = max(0, min(mouse_x, width - size))  # Width is for x-coordinate bounds
+        cy = max(0, min(mouse_y, height - size)) # Height is for y-coordinate bounds
+        surface.draw_fchar(fbuf, "cursor", cx, cy, (0,0,0), pixel_multiplier=1, font=CHARACTER_MAP)
 
 surface = sd.Bitmap(1366, 768, "", callback=renderFunction, font=CHARACTER_MAP)
 id.hook_event(id.events.KEYDOWN, handleInputs)
@@ -663,7 +653,6 @@ def authloop():
                 launcher(systemSession, "")
                 taskbar.showTaskbar(systemSession)
             systemSession.showAuthPopup(callback=onAuthenticate, appfolder="")
-            print("salty")
             
         except Exception as e:
             nsys.log(e.args)
@@ -673,7 +662,6 @@ def authloop():
         nsys.log("Exiting.")
 # check for arguments
 # nsys.args = ["b","test","online.sometgirl.readmereader"]
-print(nsys.args)
 
 if len(nsys.args) > 1:
     if nsys.args[1] == "test":
@@ -683,9 +671,7 @@ if len(nsys.args) > 1:
         nsys.sysState.set(nsys.sysState.testMode)
         # Log in automatically as "test" user, password "test", session type 3
         systemSession.Authenticate("test", passhash=hashlib.md5(b"test").hexdigest(), sessionType=3)
-        print(systemSession)
         time.sleep(1)
-        #systemSession.exec(print(), appfolder=nsys.args[2], arguments="test, "+nsys.args[2])
         testAppSession = AppSession(nsys.args[2],systemSession)
         testAppSession.exec("test")
     else:
@@ -695,5 +681,4 @@ else:
 try:
     surface.run()
 except KeyboardInterrupt:
-    print("Stopping bitch!")
     exit()

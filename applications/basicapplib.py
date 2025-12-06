@@ -210,7 +210,6 @@ class Application():
         if self.thread != None:
             self.thread.terminate()
     def exec(self, session, args):
-        print("Balls")
         global windows
         self.session = session
         global resized_bmps, previous_bmps

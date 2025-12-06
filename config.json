@@ -27,12 +27,48 @@
         "user": {
             "name": "user",
             "kind": 1,
-            "pass": "5f4dcc3b5aa765d61d8327deb882cf99"
+            "pass": "5f4dcc3b5aa765d61d8327deb882cf99",
+            "cfg": {
+                "colours": {
+                    "taskbar": {
+                        "bg": [113,82,168],
+                        "buttons": [190,190,190],
+                        "label": [0,0,0]
+                    },
+                    "bg": [113, 135, 199],
+                    "windows": {
+                        "border": [255,255,255],
+                        "title": [0,0,0],
+                        "closebg": [255,0,0],
+                        "closefg":[0,0,0],
+                        "background": [200,200,200],
+                        "foreground": [0,0,0]
+                    }
+                }
+            }
         },
         "test": {
             "name": "test",
             "kind": 3,
-            "pass": "098f6bcd4621d373cade4e832627b4f6"
+            "pass": "098f6bcd4621d373cade4e832627b4f6",
+            "cfg": {
+                "colours": {
+                    "taskbar": {
+                        "bg": [113,82,168],
+                        "buttons": [190,190,190],
+                        "label": [0,0,0]
+                    },
+                    "bg": [113, 135, 199],
+                    "windows": {
+                        "border": [255,255,255],
+                        "title": [0,0,0],
+                        "closebg": [255,0,0],
+                        "closefg":[0,0,0],
+                        "background": [200,200,200],
+                        "foreground": [0,0,0]
+                    }
+                }
+            }
         }
     }
 }

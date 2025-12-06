@@ -8,7 +8,6 @@ class PermissionSubsystem:
         self.applications = {}
         self.load_permissions()
         self.sync_with_meta_jsons()
-        # list all applications in the XML file
 
     def load_permissions(self):
         """Load application data and permissions from the XML file."""
