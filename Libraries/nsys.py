@@ -300,7 +300,7 @@ class AppSession:
             app_module = importlib.util.module_from_spec(app_spec)
             app_spec.loader.exec_module(app_module)
             app_instance = app_module.self
-            cls.app_thread = threading.Thread(target=app_instance.exec, args=(cls, arguments), daemon=False)
+            cls.app_thread = threading.Thread(target=app_instance.exec, args=(cls, arguments), daemon=True)
             cls.app_thread.start()
         except PermissionError as e:
             print("Running " + appfolder +  " failed with PermissionError: " + str(e))

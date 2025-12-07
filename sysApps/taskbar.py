@@ -7,7 +7,6 @@ nsys = module_from_spec(spec := spec_from_file_location(
 ))
 spec.loader.exec_module(nsys)
 
-print(surface.width, surface.height)  
 taskbarId = -1
 
     
@@ -18,15 +17,13 @@ def showTaskbar(session: nsys.Session):
         sysUI.pop(taskbarId)
     taskbar = sysUI.append({
         "title": "Taskbar",
-        "pos": (0, "surface.height - 30"),
-        "geo": ("surface.width", 30),
+        "pos": (0, {"op": "-", "left":"sH", "right": 30}),
+        "geo": (1366, 30),
         "colour": ccfg.get("bg"),
         "fixed": True,  # This window will not be draggable and has no title or border
         "components": [
-            {"type": "button", "text": "Start", "colour":  ccfg.get("label"), "bg": ccfg.get("bg"), "border": (0, 0, 0), 
+            {"type": "button", "text": "Start", "colour":  ccfg.get("label"), "bg": ccfg.get("buttons"), "border": ccfg.get("label"), 
             "on_click": lambda: launcher(systemSession, "")},
-            {"type": "button", "text": "dEFENSETRATE TASKBARM", "colour": ccfg.get("label"), "bg": ccfg.get("bg"), "border": (0, 0, 0), "pos": (200,0),
-            "on_click": lambda: sysUI.pop(taskbarId)},
         ],
         "showOnlyLoggedIn": True,  # Only show this taskbar if the user is logged in
     })

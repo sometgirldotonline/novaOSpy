@@ -2,7 +2,7 @@ import Libraries.nsys as nsys
 import json, hashlib, time, threading;
 from permissions import PermissionSubsystem
 from Drivers.surfaceDriverpygOnly import SurfaceDriver as sd
-from Fonts.PY.autofont import getfont as getfontmap
+from Libraries.autofont import getfont as getfontmap
 from Fonts.PY.mdi import getfont as geticons
 import numpy as np
 from Libraries.nsys import AppSession, windows
@@ -90,18 +90,18 @@ def getTopWinForPos(x, y):
     canidates = []
     sysUICanidates = []
     for win in windows:
-        wx = int(eval(str(win["pos"][0])))
-        wy = int(eval(str(win["pos"][1])))
-        ww = int(eval(str(win["geo"][0])))
-        wh = int(eval(str(win["geo"][1])))
+        wx = parseSmartVar(win["pos"][0])
+        wy = parseSmartVar(win["pos"][1])
+        ww = parseSmartVar(win["geo"][0])
+        wh = parseSmartVar(win["geo"][1])
         if wx <= x <= wx + ww:
             if wy <= y <= wy + wh:
                 canidates.append(win)
     for win in sysUI:
-        sys_x = int(eval(str(win["pos"][0])))
-        sys_y = int(eval(str(win["pos"][1])))
-        sys_w = int(eval(str(win["geo"][0])))
-        sys_h = int(eval(str(win["geo"][1])))
+        sys_x = parseSmartVar(win["pos"][0])
+        sys_y = parseSmartVar(win["pos"][1])
+        sys_w = parseSmartVar(win["geo"][0])
+        sys_h = parseSmartVar(win["geo"][1])
         if sys_x <= x <= sys_x + sys_w:
             if sys_y <= y <= sys_y + sys_h:
                 sysUICanidates.append(win)
@@ -257,6 +257,31 @@ def launcher(session, args):
 
 
 
+def parseSmartVar(v):
+    if isinstance(v, int):
+        return v
+    if isinstance(v, str):
+        if v.lower().strip() == "sw":
+            v = surface.width
+        elif v.lower().strip() == "sh":
+            v = surface.height 
+    elif isinstance(v, dict):
+        op = v["op"]
+        l = parseSmartVar(v["left"])    
+        r = parseSmartVar(v["right"])
+
+        match op:
+            case "+":
+                v =  l + r
+            case "-":
+                v =  l - r
+            case "*":
+                v = l * r
+            case "/":
+                v = l / r
+            case __:
+                raise ValueError("Unknown expr: "+ str(l) + " " + str(op) + " " + str(r))
+    return int(v)
 
 
 def drawAppWin(elem):
@@ -268,29 +293,29 @@ def drawAppWin(elem):
         elem["onFrameStart"](elem["frameCount"])
     colour = elem["colour"]
     w, h = elem["geo"]
-    w = int(eval(str(w)))
-    h = int(eval(str(h)))
-    # elem["fbuf"] = np.zeros((elem['geo'][1], elem["geo"][0], 3), dtype=np.uint8)
+    x, y = elem["pos"]
+    vars = [w, h, x, y]
+    for v in vars:
+        v = parseSmartVar(v)
+    w, h, x, y = vars
     if("clearFrames" in elem and elem["clearFrames"]):
         elem["fbuf"][0:h, 0:w] = colour
     type = "window"
     if elem in sysUI:
         type = "sysui"
-    x, y = elem["pos"]
-    x = int(eval(str(x)))
-    y = int(eval(str(y)))
+
     if "components" in elem:
         for comp in elem["components"]:
-            comp_xo = int(eval(str(comp["pos"][0]))) if "pos" in comp else 0
-            comp_yo = int(eval(str(comp["pos"][1]))) if "pos" in comp else 0
+            comp_xo = parseSmartVar(comp["pos"][0]) if "pos" in comp else 0
+            comp_yo = parseSmartVar(comp["pos"][1]) if "pos" in comp else 0
             comp_w = None
             comp_h = None
             if "geo" in comp:
-                comp_w = int(eval(str(comp["geo"][0])))
-                comp_h = int(eval(str(comp["geo"][1])))
+                comp_w = parseSmartVar(comp["geo"][0])
+                comp_h = parseSmartVar(comp["geo"][1])
             if "fixed" in elem and elem["fixed"]:
-                comp_x = int(eval(str(comp_xo)))
-                comp_y = int(eval(str(comp_yo)))
+                comp_x = parseSmartVar(comp_xo)
+                comp_y = parseSmartVar(comp_yo)
             else:
                 comp_x = 5 + comp_xo
                 comp_y =  30 + comp_yo
@@ -324,8 +349,8 @@ def drawAppWin(elem):
                 # use the previous components bbox for positioning offset if it exists, and if this element did not specify a position, so we can autmolatically position elements vertically, downwards
                 t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y)
                 if "geo" in comp:
-                    cw = int(eval(str(comp["geo"][0])))
-                    ch = int(eval(str(comp["geo"][1])))
+                    cw = parseSmartVar(comp["geo"][0])
+                    ch = parseSmartVar(comp["geo"][1])
                 else:
                     cw = t[1]+ 10
                     ch = t[0]+ 10
@@ -410,11 +435,11 @@ def handleMouseInput(e):
                 else: 
                     break
                 w, h = elem["geo"]
-                w = int(eval(str(w)))
-                h = int(eval(str(h)))
+                w = parseSmartVar(w)
+                h = parseSmartVar(h)
                 x, y = elem["pos"]
-                x = int(eval(str(x)))
-                y = int(eval(str(y)))
+                x = parseSmartVar(x)
+                y = parseSmartVar(y)
                 if x <= mouse_x <= x + w and y <= mouse_y <= y + h:
                     if wt == "window":
                         windows.append(windows.pop(windows.index(gtwfp)))
@@ -442,13 +467,13 @@ def handleMouseInput(e):
                                 if "components" in elem:
                                     for comp in elem["components"]:
                                         if "bbox" in comp:
-                                            comp_x = comp["bbox"][0] + int(eval(str(elem["pos"][0])))
-                                            comp_y = comp["bbox"][1] + int(eval(str(elem["pos"][1])))
-                                            cw = int(eval(str(comp["bbox"][2])))
-                                            ch = int(eval(str(comp["bbox"][3])))
+                                            comp_x = comp["bbox"][0] + parseSmartVar(elem["pos"][0])
+                                            comp_y = comp["bbox"][1] + parseSmartVar(elem["pos"][1])
+                                            cw = parseSmartVar(comp["bbox"][2])
+                                            ch = parseSmartVar(comp["bbox"][3])
                                         else:
-                                            comp_x = int(eval(str(elem["pos"][0])))
-                                            comp_y = int(eval(str(elem["pos"][1])))
+                                            comp_x = parseSmartVar(elem["pos"][0])
+                                            comp_y = parseSmartVar(elem["pos"][1])
                                             cw = 0
                                             ch = 0
                                         if comp_x <= mouse_x <= comp_x + cw and comp_y <= mouse_y <= comp_y + ch:
@@ -507,12 +532,7 @@ fbw = None
 fbh = None
 fbc = None
 fbuf = None
-def frameDrawNew():
-    global fbc, fbuf, fbw, fbh
-    width = fbw 
-    height = fbh
-    frame = fbc
-    framebuf = fbuf
+
 
 
 def renderFunction(framebuf, frame, width, height, eventgetter=None):
@@ -539,11 +559,11 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
             if "showOnlyLoggedIn" in elem and elem["showOnlyLoggedIn"]:
                 break
         w, h = elem["geo"]
-        w = int(eval(str(w)))
-        h = int(eval(str(h)))
         x, y = elem["pos"]
-        x = int(eval(str(x)))
-        y = int(eval(str(y)))
+        w = parseSmartVar(w)
+        h = parseSmartVar(h)
+        x = parseSmartVar(x)
+        y = parseSmartVar(y)
         if "stamp" not in elem:
             elem["stamp"] = time.time()
         if type == "window":
@@ -567,8 +587,8 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
             title_y = y + 5
         # if we dont have Fbuf or its bigger than our screen, create a new one or if our h/w is not the expected h/w 
         if "fbuf" not in elem or elem["fbuf"].shape[0] > surface.height or elem["fbuf"].shape[1] > surface.width or elem["fbuf"].shape[0] != h or elem["fbuf"].shape[1] != w:
-            elem["fbuf"] = np.zeros((int(eval(str(elem['geo'][1]))), int(eval(str(elem["geo"][0]))), 3), dtype=np.uint8)
-            elem["fbuf"][0:int(eval(str(h))), 0:int(eval(str(w)))] = colour
+            elem["fbuf"] = np.zeros((parseSmartVar(elem['geo'][1]), parseSmartVar(elem["geo"][0]), 3), dtype=np.uint8)
+            elem["fbuf"][0:parseSmartVar(h), 0:parseSmartVar(w)] = colour
             elem["indexbak"] = None
         if "renderthread" not in elem or ("renderthread" in elem and elem["renderthread"] == None):
             if (("cbak" in elem and elem["cbak"] != elem ["components"]) or "cbak" not in elem) or (("fbak" in elem and "focus" in elem and elem["fbak"] != elem ["focus"]) or "fbak" not in elem) or (("indexbak" in elem and elem["indexbak"] != wsysui.index(elem)) or "indexbak" not in elem) or ("drawAlways" in elem and elem["drawAlways"]):
@@ -594,7 +614,7 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
             # framebuf[y:y+elem["fbuf"].shape[0], x:x+elem["fbuf"].shape[1]] = elem["fbuf"][:y+elem["fbuf"].shape[0], :x+elem["fbuf"].shape[1]]  # Draw the component buffer onto the main frame buffer
             # Sizes
             fh, fw = (height, width)  # framebuf height & width
-            eh, ew = (int(eval(str(elem["fbuf"].shape[0]))), int(eval(str(elem["fbuf"].shape[1]))))  # element height & width
+            eh, ew = (parseSmartVar(elem["fbuf"].shape[0]), parseSmartVar(elem["fbuf"].shape[1]))  # element height & width
 
             # Compute the actual height and width we can draw without overflow
             h2 = min(eh, fh - y)
@@ -661,7 +681,7 @@ def authloop():
         nsys.log()
         nsys.log("Exiting.")
 # check for arguments
-# nsys.args = ["b","test","online.sometgirl.readmereader"]
+nsys.args = ["b","test","com.example.helloworld"]
 
 if len(nsys.args) > 1:
     if nsys.args[1] == "test":
@@ -671,6 +691,7 @@ if len(nsys.args) > 1:
         nsys.sysState.set(nsys.sysState.testMode)
         # Log in automatically as "test" user, password "test", session type 3
         systemSession.Authenticate("test", passhash=hashlib.md5(b"test").hexdigest(), sessionType=3)
+        taskbar.showTaskbar(systemSession)
         time.sleep(1)
         testAppSession = AppSession(nsys.args[2],systemSession)
         testAppSession.exec("test")

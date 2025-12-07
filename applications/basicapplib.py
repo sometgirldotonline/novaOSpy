@@ -320,11 +320,9 @@ class ImagePreprocessor():
                 print(f"Image {filename} not found in cache.")
                 return None
         if cache_key in previous_bmps:
-             print("Found Previously in pvbmps")
              return previous_bmps[cache_key]
         cache_key = (md5_hash_file(filename), target_width, target_height)
         if cache_key in resized_bmps:
-            print("Found Previously in rebmps")
             return resized_bmps[cache_key]
         # Check if the raw BMP data is already cached for the image without resizing
         with open(filename, "rb") as f:
@@ -390,7 +388,6 @@ class ImagePreprocessor():
         cache_key = (md5_hash_file(filename), target_width, target_height)
         resized_bmps[cache_key] = np.array(resized)
         self.myBitmaps[cache_key] = resized
-        print("Found Previously in pvbmps")
         return resized
 
     def clearNFirstImages(self, n):

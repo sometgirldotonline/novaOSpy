@@ -5,6 +5,7 @@ import pathlib
 from PIL import Image, ImageFont, ImageDraw
 from fontTools.ttLib import TTFont
 import subprocess
+import numpy as np 
 FONT_SIZE = 12  # change as needed
 
 def glyph_names(font_path):
@@ -89,7 +90,7 @@ def getfont():
                         max_width = max(max_width, i + 1)
             bitmap = [line[:max_width] for line in bitmap]
 
-            charmap[name] = bitmap
+            charmap[name] = np.array([[c == '1' for c in line] for line in bitmap], dtype=bool)
         except Exception as e:
             print(f"Error rendering {name}: {e}")
     return charmap

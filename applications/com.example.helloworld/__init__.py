@@ -21,10 +21,9 @@ def onFrameDraw(win2, frameCount):
         current_image = ip.getCurrentFrameImage()
         if current_image is not None:
             im.set({"image": current_image})
-        ip.cacheAheadImages(ahead=20)  # Cache ahead to ensure smooth playback
         ip.advanceFrameCount()
         imgf += 1
-        if imgf >= 10:
+        if imgf >= 119:
             # ip.clearAllCaches()
             ip.setFrameCount(0)
             imgf = 0

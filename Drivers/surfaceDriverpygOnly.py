@@ -100,7 +100,7 @@ class SurfaceDriver:
             self.rate = 30  # Default refresh rate
             self.callback = callback
             self.eventgetter =  pygame.event.get()
-            pygame.mouse.set_visible(False)  # Hide the mouse cursor            # Set up the display
+            # pygame.mouse.set_visible(False)  # Hide the mouse cursor            # Set up the display
             self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE,  pygame.DOUBLEBUF | pygame.HWSURFACE)
             pygame.display.set_caption(self.title)
             # Create a numpy array for raw pixel data (RGB format) with shape (height, width, 3)
@@ -111,7 +111,7 @@ class SurfaceDriver:
             self.running = True
             self.font = font
             if not hasattr(self.font,'cursor'):
-                self.font['cursor'] = [
+                bitmap = [
     "01111000000000000000",
     "10001100000000000000",
     "10100110000000000000",
@@ -140,6 +140,7 @@ class SurfaceDriver:
     "00000000110000110000",
     "00000000011111100000",
 ]
+                self.font['cursor'] = np.array([[c == '1' for c in line] for line in bitmap], dtype=bool)
             if not hasattr(self.font,'missing'):
                 self.font['missing'] = [
         "11111111111111111111",

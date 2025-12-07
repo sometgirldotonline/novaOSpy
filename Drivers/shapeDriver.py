@@ -1,4 +1,6 @@
-import numpy,math
+import math
+import numpy as np
+import cv2
 cgmap = {
     "-": "hyphen",
     "_": "underscore",
@@ -168,31 +170,24 @@ class Bitmap:
                 top_padding = text_max_height - char_height_scaled
 
                 # Draw the character (with or without cursor)
-                if pixel_multiplier >= 1.0:
-                    for row_index, row in enumerate(char_pixels_with_cursor):
-                        for col_index, pixel in enumerate(row):
-                            if pixel == "1":
-                                for dy in range(int(math.ceil(pixel_multiplier))):
-                                    for dx in range(int(math.ceil(pixel_multiplier))):
-                                        px = int(line_cursor_x + col_index * pixel_multiplier + dx)
-                                        py = int(cursor_y + top_padding + row_index * pixel_multiplier + dy)
-                                        if py < pixel_data.shape[0] and px < pixel_data.shape[1]:
-                                            pixel_data[py, px] = colour
-                else:
-                    skip_factor = 1.0 / pixel_multiplier
-                    scaled_width = max(1, int(len(char_pixels_with_cursor[0]) * pixel_multiplier))
-                    scaled_height = max(1, int(len(char_pixels_with_cursor) * pixel_multiplier))
-                    for scaled_y in range(scaled_height):
-                        for scaled_x in range(scaled_width):
-                            source_y = int(scaled_y / pixel_multiplier)
-                            source_x = int(scaled_x / pixel_multiplier)
-                            if source_y < len(char_pixels_with_cursor) and source_x < len(char_pixels_with_cursor[0]):
-                                if char_pixels_with_cursor[source_y][source_x] == "1":
-                                    px = int(line_cursor_x + scaled_x)
-                                    py = int(cursor_y + top_padding + scaled_y)
-                                    if py < pixel_data.shape[0] and px < pixel_data.shape[1]:
-                                        pixel_data[py, px] = colour
-                # draww the cursor ( a 2px wide line with the height as the max height of any charecters) if curpos matches oci
+                if isinstance(char_pixels, list):
+                        char_pixels = np.array([[c == '1' for c in line] for line in char_pixels], dtype=bool)
+                if isinstance(char_pixels, list):
+                    char_pixels = np.array([[c == '1' for c in line] for line in char_pixels], dtype=bool)
+                scaled = cv2.resize(char_pixels.astype(np.uint8), None, fx=pixel_multiplier, fy=pixel_multiplier, interpolation=cv2.INTER_CUBIC).astype(bool)
+                h, w = scaled.shape
+                dest_y = int(cursor_y + top_padding)
+                y1 = max(0, dest_y)
+                y2 = min(pixel_data.shape[0], dest_y+h)
+                dest_x = line_cursor_x
+                x1 = max(0, dest_x)
+                x2 = min(pixel_data.shape[1], dest_x + w)
+                mask_y_start = y1 - dest_y
+                mask_x_start = x1 - dest_x
+                if y2 > y1 and x2 > x1:
+                    sliced = scaled[mask_y_start: mask_y_start + (y2 - y1), mask_x_start: mask_x_start + (x2 - x1)]
+                    region = pixel_data[y1:y2, x1:x2]
+                    region[sliced] = (0,0,0)
                 if curpos is not None and curpos == oci:
                     cursor_x = line_cursor_x + char_width
                     cursor_y = cursor_y + top_padding
@@ -243,49 +238,21 @@ class Bitmap:
         if char in font:
             char_pixels = font[char]
         else:
-            char_pixels = font['missing']            # Support for subpixel rendering
-        if pixel_multiplier >= 1.0:
-            # Draw the character pixel-by-pixel with scaling
-            for row_index, row in enumerate(char_pixels):
-                for col_index, pixel in enumerate(row):
-                    if pixel == "1":
-                        for dy in range(int(math.ceil(pixel_multiplier))):
-                            for dx in range(int(math.ceil(pixel_multiplier))):
-                                # Correct pixel calculation
-                                px = int(x + col_index * pixel_multiplier + dx)
-                                py = int(y + row_index * pixel_multiplier + dy)
-                                
-                                # Check boundaries before writing (corrected order)
-                                if py < pixel_data.shape[0] and px < pixel_data.shape[1]:
-                                    # Correct NumPy indexing: [y, x]
-                                    pixel_data[py, px] = colour
-        else:
-            # For subpixel rendering (pixel_multiplier < 1.0)
-            # Use float-based sampling to properly handle any scale factor
-            skip_factor = 1.0 / pixel_multiplier
-            
-            # Calculate dimensions of scaled character
-            scaled_width = max(1, int(len(char_pixels[0]) * pixel_multiplier))
-            scaled_height = max(1, int(len(char_pixels) * pixel_multiplier))
-            
-            # For each pixel in the scaled output
-            for scaled_y in range(scaled_height):
-                for scaled_x in range(scaled_width):
-                    # Map back to source character
-                    source_y = int(scaled_y / pixel_multiplier)
-                    source_x = int(scaled_x / pixel_multiplier)
-                    
-                    # Make sure we're within bounds of the source character
-                    if source_y < len(char_pixels) and source_x < len(char_pixels[0]):
-                        # If this pixel is set in the source
-                        if char_pixels[source_y][source_x] == "1":
-                            # Calculate destination coordinates
-                            px = int(x + scaled_x)
-                            py = int(y + scaled_y)
-                            
-                            # Draw if in bounds
-                            if py < pixel_data.shape[0] and px < pixel_data.shape[1]:
-                                pixel_data[py, px] = colour
+            char_pixels = font['missing']
+        if isinstance(char_pixels, list):
+            char_pixels = np.array([[c == '1' for c in line] for line in char_pixels], dtype=bool)
+        scaled = cv2.resize(char_pixels.astype(np.uint8), None, fx=pixel_multiplier, fy=pixel_multiplier, interpolation=cv2.INTER_CUBIC).astype(bool)
+        h, w = scaled.shape
+        y1 = max(0, y)
+        y2 = min(pixel_data.shape[0], y+h)
+        x1 = max(0, x)
+        x2 = min(pixel_data.shape[1], x + w)
+        mask_y_start = y1 - y
+        mask_x_start = x1 - x
+        if y2 > y1 and x2 > x1:
+            sliced = scaled[mask_y_start: mask_y_start + (y2 - y1), mask_x_start: mask_x_start + (x2 - x1)]
+            region = pixel_data[y1:y2, x1:x2]
+            region[sliced] = (0,0,0)
     @staticmethod
     def draw_line(pixel_data, x1, y1, x2, y2, colour=(255, 255, 255)):
         # Bresenham's line algorithm
