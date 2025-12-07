@@ -5,9 +5,12 @@ __pycache__/
 .vscode
 Animold
 .vs/
-
+.project-notes.md
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
 .codacy/cli.sh
 localtodo.md
+
+# Scraps local notes
+.scraps/

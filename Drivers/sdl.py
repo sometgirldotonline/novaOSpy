@@ -125,8 +125,6 @@ def handle_command(command, args):
     if command == "resolution" and len(args) == 2:
         width, height = map(int, args)
         print(f"[Command] Change resolution to {width}x{height}")
-        # TODO: trigger your SDL resize logic here
-        # e.g., set a flag or call a function in your main loop
         try:
             LASTEVENT = {"event": "resize", "width": width, "height": width}
             print(f"🔄 New resolution: {width}x{width}")
