@@ -184,10 +184,9 @@ class SurfaceDriver:
             lines = text.split('\n')
             max_letter_height = max(
             [len(font[c]) if c in font else len(font['missing']) for c in text if c != '\n']
-            ) if any(c != '\n' for c in text) else 1
-            self.font[' '] = ["0" for x in range(max_letter_height)]
+            ) if any(c != '\n' or c != ' ' for c in text) else 1
             text_max_height = int(math.ceil(max_letter_height * pixel_multiplier))
-
+            font[' '] = ["0" * 3 for x in range(max_letter_height)]
             cursor_x = x
             cursor_y = y
 

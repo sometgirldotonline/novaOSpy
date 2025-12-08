@@ -20,9 +20,7 @@ def show_error(self, *args):
         exit()
 
 
-
-
-
+fbgeo = [None, None]
 _sysStatus = 0
 _sysUser = ""
 _config = {}

@@ -20,6 +20,38 @@ CHARACTER_MAP = getfontmap()
 nsys.log("Loaded system font")
 icons = geticons()
 nsys.log("Loaded Icon Font")
+
+cursorchar = [
+    "01111000000000000000",
+    "10001100000000000000",
+    "10100110000000000000",
+    "10110011000000000000",
+    "10111001100000000000",
+    "10111100110000000000",
+    "10111110011000000000",
+    "10111111001100000000",
+    "10111111100110000000",
+    "10111111110011000000",
+    "10111111111001100000",
+    "10111111111100110000",
+    "10111111111110011000",
+    "10111111111111001100",
+    "10111111111111100110",
+    "10111111111111110010",
+    "10111111111111111010",
+    "10111111111111110010",
+    "10111111111100000110",
+    "10111111111100111100",
+    "10111110011110110000",
+    "10111000011110010000",
+    "10010011001111010000",
+    "11000111101111010000",
+    "01111100100110010000",
+    "00000000110000110000",
+    "00000000011111100000",
+]
+cursorchar = np.array([[c == '1' for c in line] for line in cursorchar], dtype=bool)
+
 winthread = []
 mouse_was_pressed = False
 mouse_pressed = (False, False, False)
@@ -29,21 +61,13 @@ hasStartedId = False
 drag_offset = (0, 0)
 dragged_element_index = None
 def overlay_image(base, overlay, pos_x, pos_y):
-    # Normalize overlay to a 3-channel uint8 numpy array if possible
     overlay_np = np.array(overlay)
-
-    # We need a boolean mask of non-black pixels. Handle both common cases:
-    # - overlay is a numpy array of shape (h, w, 3) and dtype uint8
-    # - overlay is a list/array of tuples (r,g,b) (object dtype)
     try:
-        # Fast path: numeric arrays (uint8 or similar)
         if overlay_np.ndim == 3 and overlay_np.shape[2] == 3:
             mask = np.any(overlay_np != 0, axis=-1)
         else:
-            # Fallback to object handling below
             raise ValueError
     except Exception:
-        # Ensure we have a numeric array; convert list-of-tuples to numeric
         try:
             overlay_arr = np.array(overlay, dtype=np.uint8)
             if overlay_arr.ndim == 3 and overlay_arr.shape[2] == 3:
@@ -292,12 +316,12 @@ def drawAppWin(elem):
     if "onFrameStart" in elem:
         elem["onFrameStart"](elem["frameCount"])
     colour = elem["colour"]
-    w, h = elem["geo"]
-    x, y = elem["pos"]
-    vars = [w, h, x, y]
-    for v in vars:
-        v = parseSmartVar(v)
-    w, h, x, y = vars
+    wo, ho = elem["geo"]
+    xo, yo = elem["pos"]
+    w = parseSmartVar(wo)
+    h = parseSmartVar(ho)
+    x = parseSmartVar(xo)
+    y = parseSmartVar(yo)
     if("clearFrames" in elem and elem["clearFrames"]):
         elem["fbuf"][0:h, 0:w] = colour
     type = "window"
@@ -306,16 +330,16 @@ def drawAppWin(elem):
 
     if "components" in elem:
         for comp in elem["components"]:
-            comp_xo = parseSmartVar(comp["pos"][0]) if "pos" in comp else 0
-            comp_yo = parseSmartVar(comp["pos"][1]) if "pos" in comp else 0
+            comp_xo = x if "pos" in comp else 0
+            comp_yo = y if "pos" in comp else 0
             comp_w = None
             comp_h = None
             if "geo" in comp:
-                comp_w = parseSmartVar(comp["geo"][0])
-                comp_h = parseSmartVar(comp["geo"][1])
+                comp_w = w
+                comp_h = h
             if "fixed" in elem and elem["fixed"]:
-                comp_x = parseSmartVar(comp_xo)
-                comp_y = parseSmartVar(comp_yo)
+                comp_x = comp_xo
+                comp_y = comp_yo
             else:
                 comp_x = 5 + comp_xo
                 comp_y =  30 + comp_yo
@@ -348,15 +372,16 @@ def drawAppWin(elem):
             elif(comp["type"] == "button"):
                 # use the previous components bbox for positioning offset if it exists, and if this element did not specify a position, so we can autmolatically position elements vertically, downwards
                 print(w)
-                t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y,width=w-250)
+                t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y,width=w)
                 if "geo" in comp:
-                    cw = parseSmartVar(comp["geo"][0])
-                    ch = parseSmartVar(comp["geo"][1])
+                    cw = w
+                    ch = h
                 else:
                     cw = t[1]+ 10
                     ch = t[0]+ 10
                                 # Top Border
                 ch += 10
+                ch -=  (len(comp["text"].split(" ")) - 1)
                 cb=comp["border"]
                 #border
                 elem["fbuf"][comp_y-2:comp_y+ch+2, comp_x-2:comp_x+cw+2] = cb
@@ -436,12 +461,12 @@ def handleMouseInput(e):
                         i = sysUI.index(gtwfp)
                 else: 
                     break
-                w, h = elem["geo"]
-                w = parseSmartVar(w)
-                h = parseSmartVar(h)
-                x, y = elem["pos"]
-                x = parseSmartVar(x)
-                y = parseSmartVar(y)
+                wo, ho = elem["geo"]
+                xo, yo = elem["pos"]
+                w = parseSmartVar(wo)
+                h = parseSmartVar(ho)
+                x = parseSmartVar(xo)
+                y = parseSmartVar(yo)
                 if x <= mouse_x <= x + w and y <= mouse_y <= y + h:
                     if wt == "window":
                         windows.append(windows.pop(windows.index(gtwfp)))
@@ -469,13 +494,13 @@ def handleMouseInput(e):
                                 if "components" in elem:
                                     for comp in elem["components"]:
                                         if "bbox" in comp:
-                                            comp_x = comp["bbox"][0] + parseSmartVar(elem["pos"][0])
-                                            comp_y = comp["bbox"][1] + parseSmartVar(elem["pos"][1])
-                                            cw = parseSmartVar(comp["bbox"][2])
-                                            ch = parseSmartVar(comp["bbox"][3])
+                                            comp_x = comp["bbox"][0] + x
+                                            comp_y = comp["bbox"][1] + y
+                                            cw = comp["bbox"][2]
+                                            ch = comp["bbox"][3]
                                         else:
-                                            comp_x = parseSmartVar(elem["pos"][0])
-                                            comp_y = parseSmartVar(elem["pos"][1])
+                                            comp_x = x
+                                            comp_y = y
                                             cw = 0
                                             ch = 0
                                         if comp_x <= mouse_x <= comp_x + cw and comp_y <= mouse_y <= comp_y + ch:
@@ -536,98 +561,63 @@ fbc = None
 fbuf = None
 
 
-
 def renderFunction(framebuf, frame, width, height, eventgetter=None):
     global fbc, fbuf, windows, dragging, drag_offset, dragged_element_index, mouse_was_pressed, mouse_pressed, cDragWin, id, hasStartedId, focus, fbw, fbh, overlayfb, dmRunning
     fbw = width
     fbh = height
+    nsys.fbgeo = [width, height]
     fbc = frame
     fbuf = framebuf
     id.poll(eventgetter)
-    # rag(framebuf, frame, width, height)
+    
     surface.fill_screen((113, 135, 199))
     mouse_x, mouse_y = id.get_mouse_position()
     if dmRunning == False:
         threading.Thread(target=drawMouse, daemon=True).start()
+    
+    # Cache parsed values once
+    parsed_elems = []
+    for elem in windows + sysUI:
+        w = parseSmartVar(elem["geo"][0])
+        h = parseSmartVar(elem["geo"][1])
+        x = parseSmartVar(elem["pos"][0])
+        y = parseSmartVar(elem["pos"][1])
+        parsed_elems.append((elem, x, y, w, h))
+    
+    # Single pass through all elements
+    for elem, x, y, w, h in parsed_elems:
+        elem_type = "sysui" if elem in sysUI else "window"
         
-
-    wsysui = windows + sysUI
-    for elem in wsysui:
-        type = "window"
-        if elem in sysUI:
-            type = "sysui"
-        # check if systems state is authenticated
+        # Skip if not authenticated
         if nsys.sysState.get() == nsys.sysState.awaitLogin:
-            if "showOnlyLoggedIn" in elem and elem["showOnlyLoggedIn"]:
-                break
-        w, h = elem["geo"]
-        x, y = elem["pos"]
-        w = parseSmartVar(w)
-        h = parseSmartVar(h)
-        x = parseSmartVar(x)
-        y = parseSmartVar(y)
-        if "stamp" not in elem:
-            elem["stamp"] = time.time()
-        if type == "window":
-            if x > surface.width or x < 0:
-                windows[windows.index(elem)]["opos"] = elem["pos"]
-                windows[windows.index(elem)]["pos"] = (0, y)
-            if y > surface.height or y < 0:
-                windows[windows.index(elem)]["opos"] = elem["pos"]
-                windows[windows.index(elem)]["pos"] = (x, 0)
-            if "opos" in elem and elem["opos"] is not None:
-                opos_x, opos_y = elem["opos"]
-                if 0 <= opos_x <= width - w and 0 <= opos_y <= height - h:
-                    windows[windows.index(elem)]["pos"] = (opos_x, opos_y)
-                    windows[windows.index(elem)]["opos"] = None   
+            if elem.get("showOnlyLoggedIn", False):
+                continue
         
-        colour = elem["colour"]
-
-        if type == "window":
-            title = elem["title"]
-            title_x = x + 5
-            title_y = y + 5
-        # if we dont have Fbuf or its bigger than our screen, create a new one or if our h/w is not the expected h/w 
-        if "fbuf" not in elem or elem["fbuf"].shape[0] > surface.height or elem["fbuf"].shape[1] > surface.width or elem["fbuf"].shape[0] != h or elem["fbuf"].shape[1] != w:
-            elem["fbuf"] = np.zeros((parseSmartVar(elem['geo'][1]), parseSmartVar(elem["geo"][0]), 3), dtype=np.uint8)
-            elem["fbuf"][0:parseSmartVar(h), 0:parseSmartVar(w)] = colour
-            elem["indexbak"] = None
-        if "renderthread" not in elem or ("renderthread" in elem and elem["renderthread"] == None):
-            if (("cbak" in elem and elem["cbak"] != elem ["components"]) or "cbak" not in elem) or (("fbak" in elem and "focus" in elem and elem["fbak"] != elem ["focus"]) or "fbak" not in elem) or (("indexbak" in elem and elem["indexbak"] != wsysui.index(elem)) or "indexbak" not in elem) or ("drawAlways" in elem and elem["drawAlways"]):
-                elem["indexbak"] = wsysui.index(elem)
-                drawAppWin(elem)
-                # elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=True)
-                # elem["renderthread"].start()
-                if "firstFrameComplete" not in elem:
-                    if "waitFirstDraw" in elem and elem["waitFirstDraw"]:
-                        if elem["renderthread"] != None:
-                            elem["renderthread"].join()
-                        else:
-                            # elem["renderthread"] = threading.Thread(target=lambda: drawAppWin(elem), daemon=True)
-                            # elem["renderthread"].start()
-                            # if elem["renderthread"] != None:
-                                # elem["renderthread"].join()
-                            drawAppWin(elem)
-                    elem["firstFrameComplete"] = True
-                
-        if "fixed" in elem and elem["fixed"]:
-            framebuf[y:y+h, x:x+w] = elem["fbuf"]
+        # Create/update framebuffer once
+        if "fbuf" not in elem or elem["fbuf"].shape != (h, w, 3):
+            elem["fbuf"] = np.zeros((h, w, 3), dtype=np.uint8)
+            elem["fbuf"][:] = elem["colour"]
+            elem["cbak"] = None
+        
+        # Draw if needed
+        if (not elem.get("cbak") or elem["cbak"] != elem.get("components") or 
+            elem.get("drawAlways")):
+            drawAppWin(elem)
+        
+        # Blit to screen
+        if elem_type == "window":
+            framebuf[y:y+h, x:x+w] = elem["fbuf"][:h, :w]
         else:
-            # framebuf[y:y+elem["fbuf"].shape[0], x:x+elem["fbuf"].shape[1]] = elem["fbuf"][:y+elem["fbuf"].shape[0], :x+elem["fbuf"].shape[1]]  # Draw the component buffer onto the main frame buffer
-            # Sizes
-            fh, fw = (height, width)  # framebuf height & width
-            eh, ew = (parseSmartVar(elem["fbuf"].shape[0]), parseSmartVar(elem["fbuf"].shape[1]))  # element height & width
+            framebuf[y:y+h, x:x+w] = elem["fbuf"][:h, :w]
+        title = "Unknown Window"
+        title_x = x + 5
+        title_y = y + 5
+        if "title" in elem:
+            title = elem["title"]
 
-            # Compute the actual height and width we can draw without overflow
-            h2 = min(eh, fh - y)
-            w2 = min(ew, fw - x)
-
-            # Clip only if within framebuf bounds
-            if h2 > 0 and w2 > 0:
-                framebuf[y:y+h2, x:x+w2] = elem["fbuf"][:h2, :w2]
         if "fixed" not in elem or not elem["fixed"]:
             framebuf[y:y+25, x:x+w] = (255, 255, 255)
-            surface.draw_text(framebuf, title, title_x, title_y-5, (0, 0, 0), pixel_multiplier=1.2, width=w-30, height=25)
+            surface.draw_text(framebuf, title, title_x, title_y-5, (0, 0, 0), pixel_multiplier=2, width=w-30, height=25)
             framebuf[y:y+h, x:x+3] = (255, 255, 255)             # Left
             framebuf[y:y+h, x+w-3:x+w] = (255, 255, 255)         # Right
             framebuf[y+h-3:y+h, x:x+w] = (255, 255, 255)         # Bottom
@@ -640,7 +630,8 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
                 framebuf[y+3:y+22,(x+w)-23:(x+w)-3] = (255,100,100)  # Brighter red when hovering
             else:
                 framebuf[y+3:y+22,(x+w)-23:(x+w)-3] = (255,0,0)      # Normal red
-            surface.draw_fchar(framebuf, "close", (x+w)-23, y+7, (0,0,0), font=icons, pixel_multiplier=0.95)    # Cursor (white square)
+            surface.draw_fchar(framebuf, icons["close"], (x+w)-23, y+7, (0,0,0), pixel_multiplier=1)    # Cursor (white square)
+
 dmRunning = False
 def drawMouse():
     global id, fbw, fbh, dmRunning, fbuf
@@ -650,9 +641,9 @@ def drawMouse():
     size = 20
     while True:
         mouse_x, mouse_y = id.get_mouse_position()
-        cx = max(0, min(mouse_x, width - size))  # Width is for x-coordinate bounds
-        cy = max(0, min(mouse_y, height - size)) # Height is for y-coordinate bounds
-        surface.draw_fchar(fbuf, "cursor", cx, cy, (0,0,0), pixel_multiplier=1, font=CHARACTER_MAP)
+        cx = max(0, min(mouse_x, fbuf.shape[1] - size))  # Width is for x-coordinate bounds
+        cy = max(0, min(mouse_y, fbuf.shape[0] - size)) # Height is for y-coordinate bounds
+        surface.draw_fchar(fbuf, cursorchar, cx, cy, (0,0,0), pixel_multiplier=1)
 
 surface = sd.Bitmap(1366, 768, "", callback=renderFunction, font=CHARACTER_MAP)
 id.hook_event(id.events.KEYDOWN, handleInputs)
@@ -683,7 +674,7 @@ def authloop():
         nsys.log()
         nsys.log("Exiting.")
 # check for arguments
-# nsys.args = ["b","test","com.example.helloworld"]
+# nsys.args = ["b","test","online.sometgirl.readmereader"]
 
 if len(nsys.args) > 1:
     if nsys.args[1] == "test":

@@ -110,37 +110,6 @@ class SurfaceDriver:
             # Running state
             self.running = True
             self.font = font
-            if not hasattr(self.font,'cursor'):
-                bitmap = [
-    "01111000000000000000",
-    "10001100000000000000",
-    "10100110000000000000",
-    "10110011000000000000",
-    "10111001100000000000",
-    "10111100110000000000",
-    "10111110011000000000",
-    "10111111001100000000",
-    "10111111100110000000",
-    "10111111110011000000",
-    "10111111111001100000",
-    "10111111111100110000",
-    "10111111111110011000",
-    "10111111111111001100",
-    "10111111111111100110",
-    "10111111111111110010",
-    "10111111111111111010",
-    "10111111111111110010",
-    "10111111111100000110",
-    "10111111111100111100",
-    "10111110011110110000",
-    "10111000011110010000",
-    "10010011001111010000",
-    "11000111101111010000",
-    "01111100100110010000",
-    "00000000110000110000",
-    "00000000011111100000",
-]
-                self.font['cursor'] = np.array([[c == '1' for c in line] for line in bitmap], dtype=bool)
             if not hasattr(self.font,'missing'):
                 self.font['missing'] = [
         "11111111111111111111",
@@ -183,7 +152,7 @@ class SurfaceDriver:
         def draw_fchar(self,pixel_data, char, x, y, colour=(255, 255, 255), pixel_multiplier=1.0, font=None):
             if font == None:
                 font = self.font
-            return self.shapeDrawer.draw_fchar(pixel_data, char, x, y, colour,pixel_multiplier, font)
+            return self.shapeDrawer.draw_fchar(pixel_data, char, x, y, colour,pixel_multiplier)
         def draw_line(self,pixel_data, x1, y1, x2, y2, colour=(255, 255, 255)):
             return self.shapeDrawer.draw_line(pixel_data,x1,x2,y1,y2,colour)
         def draw_circle(self, pixel_data, x0, y0, radius, colour=(255, 255, 255)):
@@ -210,45 +179,22 @@ class SurfaceDriver:
                     elif event.type == pygame.VIDEORESIZE:
                         self.width, self.height = event.w, event.h
                         self.screen = pygame.display.set_mode((self.width, self.height), pygame.RESIZABLE)
-                        # Always allocate pixel_data as (height, width, 3)
+                        self.surface = pygame.Surface((self.width, self.height))  # ADD THIS LINE
                         pygame.display.update()
-                        self.pixel_data = np.zeros((self.height, self.width, 3), dtype=np.uint8)  # Correct NumPy order: (height, width, 3)
-                        # If a callback is provided, use it to update the pixel data
+                        self.pixel_data = np.zeros((self.height, self.width, 3), dtype=np.uint8)
                         if self.callback:
-                            # Note: we pass width and height in the conventional order (width first, then height)
-                            self.callback(self.pixel_data, frame, self.width, self.height)                # If a callback is provided, use it to update the pixel data
+                            self.callback(self.pixel_data, frame, self.width, self.height)          # If a callback is provided, use it to update the pixel data
                 # pygame.mouse.set_visible(True)
                 if self.callback:
                     # Pass width and height in the conventional order (width first, then height)
                     self.callback(self.pixel_data, frame, self.width, self.height, eventgetter=eventgetter)# Create a surface from the pixel data
                     # pygame.mouse.set_visible(False)
-                # diff = self.oldPD != self.pixel_data
-                # labeled, _ = label(diff)
-                # rects = find_objects(labeled)
-                # if len(rects) > 15:  # threshold = e.g. 10
-                #     surface = pygame.surfarray.make_surface(self.pixel_data.swapaxes(0,1))
-                #     self.screen.blit(surface, (0, 0))
-                # else:
-                #     for slices in rects:
-                #         ys, xs = slices[:2]
-                #         x = xs.start
-                #         y = ys.start
-                #         w = xs.stop - xs.start
-                #         h = ys.stop - ys.start
-                #         subarray = self.pixel_data[y:y+h, x:x+w]
-                #         surface = pygame.surfarray.make_surface(subarray.swapaxes(0,1))
-                #         self.screen.blit(surface, (x, y))
-                # pygame.display.flip()
-                # # Note: Pygame expects pixel data in a certain format - they might be transposing
-                # # the array internally which could contribute to rotation issues
                 Thread(target=overlay_image,args=[self.pixel_data, overlayfb, 0,0],daemon=True).start()
-                pygame.surfarray.blit_array(self.surface, self.pixel_data.swapaxes(0, 1))
+                if self.pixel_data.shape[:2] == (self.surface.get_height(), self.surface.get_width()):
+                    pygame.surfarray.blit_array(self.surface, self.pixel_data.swapaxes(0, 1))
                 self.screen.blit(self.surface, (0, 0))
                 pygame.display.flip()
-                self.oldPD = self.pixel_data.copy()
-                # Increment the frame counter
                 frame += 1
-                # Limit the frame rate to 60 FPS    
                 # self.clock.tick(self.rate)
             pygame.quit()
 

@@ -6,7 +6,7 @@ from PIL import Image, ImageFont, ImageDraw
 from fontTools.ttLib import TTFont
 import subprocess
 import numpy as np 
-FONT_SIZE = 12  # change as needed
+FONT_SIZE = 10 # change as needed
 
 def glyph_names(font_path):
     font = TTFont(font_path)

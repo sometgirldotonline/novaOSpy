@@ -18,7 +18,7 @@ def showTaskbar(session: nsys.Session):
     taskbar = sysUI.append({
         "title": "Taskbar",
         "pos": (0, {"op": "-", "left":"sH", "right": 30}),
-        "geo": (1366, 30),
+        "geo": ("sW", 30),
         "colour": ccfg.get("bg"),
         "fixed": True,  # This window will not be draggable and has no title or border
         "components": [

@@ -15,15 +15,15 @@ def ofd(win2, framecount):
 mdheadings = [
     {
         "fmt": "###",
-        "mult": 1.3
+        "mult": 2
     },
         {
         "fmt": "##",
-        "mult": 1.5
+        "mult": 2.5
     },
         {
         "fmt": "#",
-        "mult": 1.8
+        "mult": 3
     },
 ]
     
