@@ -12,6 +12,6 @@ def main(session, args=[]):
         label = win.Label()
         label.set({"text":"Welcome, you have the correct permissions!"})
 import os
-self = basicapplib.Application(app_folder=os.path.dirname(os.path.realpath(__file__)))
+self = basicapplib.Application(app_folder="win.nova.ins")
 
 self.setScript(kind="main", program=main)

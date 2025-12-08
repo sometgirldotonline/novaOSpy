@@ -135,7 +135,7 @@ def showAuthPopup(cls, minPriv: int = 3, username: str = False, appfolder: str =
             "geo": (300, 500),
             "colour": (220, 220, 220),
             "clearFrames": True,
-            # "drawAlways": True,
+            "drawAlways": True,
             "components": [
             ],
             "stamp":lwstamp

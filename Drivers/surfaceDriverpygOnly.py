@@ -145,10 +145,10 @@ class SurfaceDriver:
             return self.shapeDrawer.draw_rect(framebuf,x,y,w,h,colour)
         def draw_border(self,framebuf,x, y, w, h, border_colour=(255, 255, 255), thickness=3):
             return self.shapeDrawer.draw_border(framebuf, x,y,w,h,border_colour, thickness)
-        def draw_text(self,pixel_data, text, x, y, colour=(255, 255, 255), spacing=2, pixel_multiplier=1.0, font=None, width=None, height=None, curpos="balls"):
+        def draw_text(self,pixel_data, text, x, y, colour=(255, 255, 255), spacing=2, pixel_multiplier=1.0, font=None, width=None, height=None, curpos="balls", wrap=False):
             if font == None:
                 font = self.font
-            return self.shapeDrawer.draw_text(pixel_data, text, x, y, colour, spacing,pixel_multiplier, font, width, height, curpos)
+            return self.shapeDrawer.draw_text(pixel_data, text, x, y, colour, spacing,pixel_multiplier, font, width, height, curpos, wrap=wrap)
         def draw_fchar(self,pixel_data, char, x, y, colour=(255, 255, 255), pixel_multiplier=1.0, font=None):
             if font == None:
                 font = self.font

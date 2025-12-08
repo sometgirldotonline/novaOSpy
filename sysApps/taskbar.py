@@ -24,6 +24,7 @@ def showTaskbar(session: nsys.Session):
         "components": [
             {"type": "button", "text": "Start", "colour":  ccfg.get("label"), "bg": ccfg.get("buttons"), "border": ccfg.get("label"), 
             "on_click": lambda: launcher(systemSession, "")},
+            {"type": "label", "text": "User", "colour":  systemSession.user},
         ],
         "showOnlyLoggedIn": True,  # Only show this taskbar if the user is logged in
     })

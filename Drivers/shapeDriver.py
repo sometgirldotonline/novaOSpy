@@ -123,11 +123,13 @@ class Bitmap:
         # Right border
         framebuf[y:y+h, x+w-thickness:x+w] = border_colour
     @staticmethod
-    def draw_text(pixel_data, text, x, y, colour=(255, 255, 255), spacing=2, pixel_multiplier=1.0, font=None, width=None, height=None, curpos="balls"):
+    def draw_text(pixel_data, text, x, y, colour=(255, 255, 255), spacing=2, pixel_multiplier=1.0, font=None, width=None, height=None, curpos="balls", wrap=True):
         if font is None:
             raise ValueError("Provide a font")
         wrap_width = width if width is not None else pixel_data.shape[1] - x
         wrapped_lines = wrap_text(text, font, spacing, pixel_multiplier, wrap_width)
+        if wrap == False:
+            wrapped_lines = [wrapped_lines[0]]
         max_letter_height = max(
             [len(font[c]) if c in font else len(font['missing']) for c in text if c != '\n']
         ) if any(c != '\n' for c in text) else 1

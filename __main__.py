@@ -617,7 +617,7 @@ def renderFunction(framebuf, frame, width, height, eventgetter=None):
 
         if "fixed" not in elem or not elem["fixed"]:
             framebuf[y:y+25, x:x+w] = (255, 255, 255)
-            surface.draw_text(framebuf, title, title_x, title_y-5, (0, 0, 0), pixel_multiplier=2, width=w-30, height=25)
+            surface.draw_text(framebuf, title, title_x, title_y-5, (0, 0, 0), pixel_multiplier=2, width=w-30, height=25, wrap=False)
             framebuf[y:y+h, x:x+3] = (255, 255, 255)             # Left
             framebuf[y:y+h, x+w-3:x+w] = (255, 255, 255)         # Right
             framebuf[y+h-3:y+h, x:x+w] = (255, 255, 255)         # Bottom
