@@ -49,6 +49,16 @@ cgmap = {
     "£": "pound",
     "€": "euro"
 }
+
+def resizeFC(char_pixels, scale):
+    char_pixels = char_pixels
+    if scale == 1.0:
+        return char_pixels
+    elif math.floor(scale) == scale and scale > 1:
+        return char_pixels.repeat(scale, axis=0).repeat(scale, axis=1)
+    else:
+        return cv2.resize(char_pixels.astype(np.uint8), None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST).astype(bool)
+        
 # ShapeDriver- Draws Shapes (duh)
 class Bitmap:
     @staticmethod
@@ -110,11 +120,12 @@ class Bitmap:
         oci = 0
         cursorAtStart = False
         newstring = ""
-        wrap_width = width if width is not None else 200  # define a reasonable default
-
+        wrap_width = width if width is not None else pixel_data.shape[1] - x  # define a reasonable default
         for line in lines:
             line_cursor_x = cursor_x
             line = line.split(" ")
+            if not line:
+                continue
             for word in line:
                 wordWidth = 0
                 for char in word:
@@ -124,8 +135,8 @@ class Bitmap:
                         char_pixels = font[cgmap[char]]
                     else:
                         char_pixels = font['missing']
-
-                    char_width = int(math.ceil(len(char_pixels[0]) * pixel_multiplier + spacing * pixel_multiplier))
+                    scaled = resizeFC(char_pixels, pixel_multiplier)
+                    char_width = scaled.shape[1] + int(spacing * pixel_multiplier)
                     wordWidth += char_width
                     if line_cursor_x + wordWidth > x + wrap_width:
                         line_cursor_x = 0
@@ -134,13 +145,15 @@ class Bitmap:
                 newstring += word + " "
 
                 line_cursor_x += wordWidth  # update cursor after adding word
-
-                
+            newstring += "\n"
+        newstring = newstring.rstrip("\n").replace("\n\n", "\n").replace("\n\n", "\n").replace("\n\n", "\n")
         if curpos == -1:
             curpos = None;
             cursorAtStart=True
         for line in newstring.split("\n"):
             line_cursor_x = cursor_x
+            if not line:
+                continue
             for char in line:
                 if char in font:
                     char_pixels = font[char]
@@ -149,32 +162,17 @@ class Bitmap:
                         char_pixels = font[cgmap[char]]
                     else:
                         char_pixels = font['missing']
-
-
-                # Add cursor to the character if curpos matches oci
-                # if curpos is not None and curpos == oci:
-                #     char_pixels_with_cursor = [row + "11" for row in char_pixels]
-                # elif cursorAtStart and oci == 0:
-                #     char_pixels_with_cursor = ["11" + row for row in char_pixels]
-                # else:
                 char_pixels_with_cursor = char_pixels
 
                 char_width = int(math.ceil(len(char_pixels_with_cursor[0]) * pixel_multiplier + spacing * pixel_multiplier))
-                
-                wrap_width = width if width is not None else pixel_data.shape[1]
-                # if line_cursor_x + char_width > x + wrap_width or line_cursor_x + char_width > pixel_data.shape[1]:
-                #     line_cursor_x = x
-                #     cursor_y += text_max_height
-
                 char_height_scaled = int(math.ceil(len(char_pixels_with_cursor) * pixel_multiplier))
                 top_padding = text_max_height - char_height_scaled
 
-                # Draw the character (with or without cursor)
                 if isinstance(char_pixels, list):
                         char_pixels = np.array([[c == '1' for c in line] for line in char_pixels], dtype=bool)
                 if isinstance(char_pixels, list):
                     char_pixels = np.array([[c == '1' for c in line] for line in char_pixels], dtype=bool)
-                scaled = cv2.resize(char_pixels.astype(np.uint8), None, fx=pixel_multiplier, fy=pixel_multiplier, interpolation=cv2.INTER_CUBIC).astype(bool)
+                scaled = resizeFC(char_pixels, pixel_multiplier)
                 h, w = scaled.shape
                 dest_y = int(cursor_y + top_padding)
                 y1 = max(0, dest_y)
@@ -201,10 +199,8 @@ class Bitmap:
                                 if py < pixel_data.shape[0] and px < pixel_data.shape[1]:
                                     pixel_data[py, px] = colour
                 elif cursorAtStart and oci == 0:
-                    # Draw the cursor at the start of the text, before the first character
                     cursor_x = line_cursor_x
                     cursor_y = y
-                    # Draw the cursor as a vertical line, default height to 20px if the text_max_height is less than 5
                     cursor_height = text_max_height if text_max_height >= 5 else 20
                     if pixel_multiplier >= 1.0:
                         for dy in range(int(math.ceil(cursor_height))):
@@ -241,7 +237,7 @@ class Bitmap:
             char_pixels = font['missing']
         if isinstance(char_pixels, list):
             char_pixels = np.array([[c == '1' for c in line] for line in char_pixels], dtype=bool)
-        scaled = cv2.resize(char_pixels.astype(np.uint8), None, fx=pixel_multiplier, fy=pixel_multiplier, interpolation=cv2.INTER_CUBIC).astype(bool)
+        scaled = resizeFC(char_pixels, pixel_multiplier)
         h, w = scaled.shape
         y1 = max(0, y)
         y2 = min(pixel_data.shape[0], y+h)

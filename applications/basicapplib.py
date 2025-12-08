@@ -803,6 +803,42 @@ class _ui:
                 callback(sysUI[dialog_id]["components"][1]["value"])
 
         windows[dialog_id]["components"][2]["on_click"] = runCallback
+    def messageBox(cls, prompt="Enter a value:", callback=None):
+        # Create a new dialog window in the JSON
+        global windows
+        dialog_id = len(windows)
+        dialog_json = {
+            "type": "dialog",
+            "title": "Message",
+            "prompt": prompt,
+            "geo": (300, 150),  # Default size for the dialog
+            "pos": (200, 200),  # Default position for the dialog
+            "colour": (250, 250, 250),
+            "components": [
+                {
+                    "type": "text",
+                    "text": prompt,
+                    "colour": (0, 0, 0)  # Default text colour
+                },
+                {
+                    "type": "button",
+                    "text": "OK",
+                    "colour": (100, 100, 150),
+                    "bg": (190, 190, 190),
+                    "border": (0, 0, 0),
+                    "on_click": None  # Placeholder for the button's click event
+                }
+            ]
+        }
+        windows.append(dialog_json)
+
+        # Assign the on_click function to the "OK" button
+        def runCallback():
+            windows.pop(dialog_id, None)
+            if callable(callback):
+                callback()
+
+        windows[dialog_id]["components"][2]["on_click"] = runCallback
 
 
 class uiElTemplate:

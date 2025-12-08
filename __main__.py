@@ -347,7 +347,8 @@ def drawAppWin(elem):
                 comp["bbox"] = (comp_x, comp_y, t[1], t[0])  # Store the bounding box of the text
             elif(comp["type"] == "button"):
                 # use the previous components bbox for positioning offset if it exists, and if this element did not specify a position, so we can autmolatically position elements vertically, downwards
-                t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y)
+                print(w)
+                t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y,width=w-250)
                 if "geo" in comp:
                     cw = parseSmartVar(comp["geo"][0])
                     ch = parseSmartVar(comp["geo"][1])
@@ -383,6 +384,7 @@ def drawAppWin(elem):
                     else:
                         crs = None # if not focused, cursor is not shown
                 #border
+                cw -= 10
                 surface.draw_border(elem["fbuf"],comp_x-2, comp_y-2, cw+4, ch+4, cb, 2)
                 #bg
                 surface.draw_rect(elem["fbuf"],comp_x, comp_y, cw, ch, comp["bg"])
@@ -681,7 +683,7 @@ def authloop():
         nsys.log()
         nsys.log("Exiting.")
 # check for arguments
-nsys.args = ["b","test","com.example.helloworld"]
+# nsys.args = ["b","test","com.example.helloworld"]
 
 if len(nsys.args) > 1:
     if nsys.args[1] == "test":

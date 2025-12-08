@@ -192,12 +192,33 @@ def showAuthPopup(cls, minPriv: int = 3, username: str = False, appfolder: str =
                         callback(cls)
                 except ValueError as e:
                     print(e)
-                    tkinter.messagebox.showerror("Missing value: Access Level", "Pick an Access Level.")
+                    windows.append({
+                        "title": "Error",
+                        "pos": (69, 180),
+                        "geo": (300, 300),
+                        "colour": (220, 220, 220),
+                        "components": [
+                            {"type": "text", "text":"Please pick an access level"},
+                            {"type": "button", "text":"OK", "on_click": (lambda: windows.pop()), "border":(0,0,0), "bg":(250,250,250),"colour":(0,0,0)}
+                        ],
+                        "stamp": time.time()    
+                    })
             except Exception as e:
                 # tkinter.messagebox.showerror("Authentication Error (" + type(e).__name__ + ")", e)
+                cls.showAuthPopup(minPriv, username, appfolder, callback)
+                windows.append({
+                    "title": "Error",
+                    "pos": (69, 180),
+                    "geo": (300, 500),
+                    "colour": (220, 220, 220),
+                    "components": [
+                        {"type": "text", "text":str(e)},
+                        {"type": "button", "text":"OK", "on_click": (lambda: windows.pop()), "border":(0,0,0), "bg":(250,250,250),"colour":(0,0,0)}
+                    ],
+                    "stamp": time.time()    
+                })
                 print(e)
                 # show auth popup again
-                cls.showAuthPopup(minPriv, username, appfolder, callback)
         loginwindow['components'].append({"type": "button", "text":"Authenticate", "on_click": handlelogin, "border":(0,0,0), "bg":(250,250,250),"colour":(0,0,0)})
         # loginwindow.mainloop()
         return cls
