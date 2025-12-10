@@ -371,7 +371,6 @@ def drawAppWin(elem):
                 comp["bbox"] = (comp_x, comp_y, t[1], t[0])  # Store the bounding box of the text
             elif(comp["type"] == "button"):
                 # use the previous components bbox for positioning offset if it exists, and if this element did not specify a position, so we can autmolatically position elements vertically, downwards
-                print(w)
                 t = surface.draw_text(elem["fbuf"], comp["text"], comp_x+5,comp_y,width=w)
                 if "geo" in comp:
                     cw = w

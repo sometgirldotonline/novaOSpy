@@ -626,7 +626,7 @@ class _ui:
         instance.colour = colour
         instance.components = []
         instance.parent = parent
-
+        instance.dirty = True
         # JSON representation of the window
         instance.nUiObject = {
             "title": instance.title,
@@ -646,6 +646,7 @@ class _ui:
         return instance
     # framedraw function
     def set(self, geo=None, pos=None, colour=None, title=None, drawAlways=None, clearFrames=None):
+        self.dirty = True
         # Update the window's properties in the JSON
         if geo is not None:
             self.nUiObject["geo"] = geo
@@ -663,14 +664,18 @@ class _ui:
         # if our window (self) has a onFrameStart function, call it
         try:
             self.ofsprog(self, fc)
+            self.dirty = True
         except Exception as e:
             nsys.log(f"Error in onFrameStart: {e}")
         # update our window's json (use the stamp to find) in the systems windows array- DO NOT CHANGE THE STAMP, USE UPDATEJSON TO GET THE JSON OBJECT THEN COMMIT IT TO THE SYSTEM's WINDOWS ARRAY
         # Update the window in the global windows list
-        for i, win in enumerate(windows):
-            if win.get("stamp") == self.nUiObject["stamp"]:
-                windows[i] = self.updateJSON()
+        if self.dirty:
+            for i, win in enumerate(windows):
+                if win.get("stamp") == self.nUiObject["stamp"]:
+                    windows[i] = self.updateJSON()
+            self.dirty = False
     def Label(self, text="Unset Value", size=12, colour=(0, 0, 0)):
+        self.dirty = True
         # Add a label component to the JSON
         element_id = len(self.nUiObject["components"])
         self.nUiObject["components"].append({
@@ -684,6 +689,7 @@ class _ui:
         return uiElTemplate(self, element_id)
 
     def Input(self, value="", size=12, colour=(0, 0, 0), bg=(255, 255, 255), border=(0, 0, 0), geo=(300, 20)):
+        self.dirty = True
         # Add an input box component to the JSON
         element_id = len(self.nUiObject["components"])
         self.nUiObject["components"].append({
@@ -699,6 +705,7 @@ class _ui:
         # Return a template object to allow further updates
         return uiElTemplate(self, element_id)
     def hookEvent(self, event, callback):
+        self.dirty = True
         # first event is onFrameStart
         if event == "onFrameStart":
             # add callback to the windows JSON so it can be called when the frame starts
@@ -707,6 +714,7 @@ class _ui:
         print(f"Hooking event '{event}' with callback {callback} for window: {self.parent.package}")
 
     def Image(self, path="luke.bmp", width=None, height=None, cachedOnly=False):
+        self.dirty = True
         element_id = len(self.nUiObject["components"])
         bmparray = None
         if path == "" or path is None:
@@ -727,6 +735,7 @@ class _ui:
         return uiElTemplate(self, element_id)
 
     def scrolledtext(self, text="Unset Value", size=12, colour=(0, 0, 0)):
+        self.dirty = True
         # Proxy scrolled text to a label in the JSON
         element_id = len(self.nUiObject["components"])
         self.nUiObject["components"].append({
@@ -740,6 +749,7 @@ class _ui:
         return uiElTemplate(self, element_id)
 
     def btn(self, text="Unset Value", size=12, colour=(100, 100, 150), bg=(190, 190, 190), border=(0, 0, 0)):
+        self.dirty = True
         # Add a button component to the JSON
         element_id = len(self.nUiObject["components"])
         self.nUiObject["components"].append({
@@ -759,6 +769,7 @@ class _ui:
         return self.nUiObject
 
     def basicAsk(cls, prompt="Enter a value:", default_value="", callback=None):
+        cls.dirty = True
         # Create a new dialog window in the JSON
         global windows
         dialog_id = len(windows)
@@ -804,6 +815,7 @@ class _ui:
 
         windows[dialog_id]["components"][2]["on_click"] = runCallback
     def messageBox(cls, prompt="Enter a value:", callback=None):
+        cls.dirty = True
         # Create a new dialog window in the JSON
         global windows
         dialog_id = len(windows)
@@ -847,6 +859,7 @@ class uiElTemplate:
         self.element_id = element_id
 
     def set(self, parameters):
+        self.parent.dirty = True
         # Update the element's properties in the JSON
         for key, value in parameters.items():
             if self.parent.nUiObject["components"][self.element_id]["type"] == "image" and key == "path":
@@ -868,4 +881,5 @@ class uiElTemplate:
         # Retrieve the element's property from the JSON
         return self.parent.nUiObject["components"][self.element_id].get(parameter)
     def setOnClick(self, command):
+        self.parent.dirty = True
         self.parent.nUiObject["components"][self.element_id]["on_click"] = command
