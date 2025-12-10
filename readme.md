@@ -7,6 +7,10 @@ This implementation is aimed at computers with python3 and pygame (but just uses
 User passwords are "password" for both.
 Loglevels:  0: Notice, 1: Error, 2: Devel, -1: None, at all, ever for some stupid reason
 
+# Demo video
+
+<video src="https://raw.githubusercontent.com/sometgirldotonline/novaOSpy/refs/heads/main/demovid.mp4">
+
 
 # Markdown test for the readme app
 ## H2
