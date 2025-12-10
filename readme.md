@@ -9,9 +9,12 @@ Loglevels:  0: Notice, 1: Error, 2: Devel, -1: None, at all, ever for some stupi
 
 # Demo video
 
-<video src="https://raw.githubusercontent.com/sometgirldotonline/novaOSpy/refs/heads/main/demovid.mp4"></video>
+https://raw.githubusercontent.com/sometgirldotonline/novaOSpy/refs/heads/main/demovid.mp4
 
 # Markdown test for the readme app
 ## H2
 ### H3
 *italic* **bold**
+
+
+
